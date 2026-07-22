@@ -11,6 +11,7 @@ package org.xpfarm.pizza.dispatch;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -135,6 +136,63 @@ final class ActionDispatcherTest {
         dispatcher.dispatch(player.proxy, button, Map.of("player", "Steve"));
 
         assertTrue(runner.ran.isEmpty(), "an unpermitted resolved command must never reach the command runner");
+    }
+
+    /**
+     * Pins the {@code dispatch} return-value contract that {@code MenuService}'s cooldown safety
+     * now depends on: a refused dispatch must return {@code false} so a refused button press never
+     * starts a cooldown. This is checked directly on the return value, not just inferred from
+     * {@code runner.ran} staying empty — the two are different assertions, and the return value is
+     * the one another class actually reads.
+     */
+    @Test
+    void refusedByAllowlistReturnsFalse() {
+        CommandAllowlist allowlist = new CommandAllowlist(Set.of("starterpack"));
+        RecordingRunner runner = new RecordingRunner();
+        ActionDispatcher dispatcher = new ActionDispatcher(fakePlugin(), allowlist, runner);
+        FakePlayer player = new FakePlayer("Steve");
+        Button button = commandButton("main.0", "op %player%", RunAs.PLAYER, List.of());
+
+        boolean dispatched = dispatcher.dispatch(player.proxy, button, Map.of("player", "Steve"));
+
+        assertFalse(dispatched, "a command whose root is not in the allowlist must return false");
+        assertTrue(runner.ran.isEmpty());
+    }
+
+    /**
+     * Same contract, exercised via the other refusal path: a placeholder value the value-check
+     * rejects (here, whitespace in a gamertag) must also return {@code false}, never run anything.
+     */
+    @Test
+    void refusedByDisallowedPlaceholderValueReturnsFalse() {
+        CommandAllowlist allowlist = new CommandAllowlist(Set.of("starterpack"));
+        RecordingRunner runner = new RecordingRunner();
+        ActionDispatcher dispatcher = new ActionDispatcher(fakePlugin(), allowlist, runner);
+        FakePlayer player = new FakePlayer(".Some Gamertag");
+        Button button = commandButton("main.0", "starterpack give %player%", RunAs.PLAYER, List.of());
+
+        boolean dispatched =
+                dispatcher.dispatch(player.proxy, button, Map.of("player", ".Some Gamertag"));
+
+        assertFalse(dispatched,
+                "a placeholder value containing whitespace must return false — this is the case "
+                        + "MenuService relies on to never start a cooldown for a refused dispatch");
+        assertTrue(runner.ran.isEmpty());
+    }
+
+    /** The other half of the contract: a dispatch that actually reaches the runner returns {@code true}. */
+    @Test
+    void successfulDispatchReturnsTrue() {
+        CommandAllowlist allowlist = new CommandAllowlist(Set.of("starterpack"));
+        RecordingRunner runner = new RecordingRunner();
+        ActionDispatcher dispatcher = new ActionDispatcher(fakePlugin(), allowlist, runner);
+        FakePlayer player = new FakePlayer("Steve");
+        Button button = commandButton("main.0", "starterpack give %player%", RunAs.PLAYER, List.of());
+
+        boolean dispatched = dispatcher.dispatch(player.proxy, button, Map.of("player", "Steve"));
+
+        assertTrue(dispatched, "a command that actually reaches the runner must return true");
+        assertEquals(List.of("starterpack give Steve"), runner.ran);
     }
 
     /**

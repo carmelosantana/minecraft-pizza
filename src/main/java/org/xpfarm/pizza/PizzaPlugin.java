@@ -108,7 +108,11 @@ public final class PizzaPlugin extends JavaPlugin {
     /**
      * Re-reads {@code config.yml} from disk, re-parses it, re-runs the startup command-root
      * validation, and swaps the live model in {@link MenuService} — all without restarting the
-     * server. Called once from {@link #onEnable} and again by {@code /pizza reload}.
+     * server. Called by {@code /pizza reload} ({@link PizzaCommand}) only. {@link #onEnable}
+     * inlines the same parse-then-validate sequence instead of calling this method, because at
+     * that point {@link #menuService} does not exist yet — it is constructed *from* the parsed
+     * {@link PizzaConfig} this produces, so nothing can call {@code menuService.reload(...)} until
+     * after that construction completes.
      */
     PizzaConfig reloadPizzaConfig() {
         PizzaConfig config = parseConfig();
