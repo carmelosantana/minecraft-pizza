@@ -88,6 +88,16 @@ final class ConfigParserTest {
     }
 
     @Test
+    void refusesUnrecognisedRunAs() {
+        PizzaConfig cfg = parse(config("main", menu(
+                Map.of("label", "Typo", "command", "starterpack give %player%", "run-as", "playr"))));
+
+        assertTrue(cfg.menus().get("main").buttons().isEmpty(),
+                "an unrecognized run-as must not silently escalate to console");
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("playr")), "refusal must be logged");
+    }
+
+    @Test
     void refusesButtonWithTwoActions() {
         PizzaConfig cfg = parse(config("main", menu(
                 Map.of("label", "Both", "command", "starterpack give %player%", "open", "other"))));

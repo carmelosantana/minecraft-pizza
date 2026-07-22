@@ -155,7 +155,11 @@ public final class ConfigParser {
             action = new Action.Invite();
         }
 
-        RunAs runAs = parseRunAs(raw.get("run-as"), id, warn);
+        Optional<RunAs> parsedRunAs = parseRunAs(raw.get("run-as"), id, warn);
+        if (parsedRunAs.isEmpty()) {
+            return Optional.empty();
+        }
+        RunAs runAs = parsedRunAs.get();
         List<String> grant = asStringList(raw.get("grant"));
 
         if (runAs == RunAs.PLAYER_ELEVATED && grant.isEmpty()) {
@@ -197,18 +201,26 @@ public final class ConfigParser {
                 new Button(id, label, image, permission, action, runAs, grant, cooldown, worlds, eachOnline));
     }
 
-    private static RunAs parseRunAs(Object raw, String id, Consumer<String> warn) {
+    /**
+     * An absent {@code run-as} defaults to {@link RunAs#CONSOLE}, but an unrecognized value is
+     * refused rather than defaulted — {@code CONSOLE} is the most privileged mode (it bypasses
+     * every permission check), so silently mapping a typo like {@code "playr"} to it would
+     * silently escalate a button the author clearly intended to run as the least privileged mode.
+     * That is exactly the inversion the fail-closed constraint exists to prevent, so it is treated
+     * as an eighth rejection alongside the other seven validation rules.
+     */
+    private static Optional<RunAs> parseRunAs(Object raw, String id, Consumer<String> warn) {
         if (raw == null) {
-            return RunAs.CONSOLE;
+            return Optional.of(RunAs.CONSOLE);
         }
         String text = String.valueOf(raw).trim().toLowerCase(Locale.ROOT);
         return switch (text) {
-            case "console" -> RunAs.CONSOLE;
-            case "player" -> RunAs.PLAYER;
-            case "player-elevated" -> RunAs.PLAYER_ELEVATED;
+            case "console" -> Optional.of(RunAs.CONSOLE);
+            case "player" -> Optional.of(RunAs.PLAYER);
+            case "player-elevated" -> Optional.of(RunAs.PLAYER_ELEVATED);
             default -> {
-                warn.accept("button " + id + " has unknown run-as '" + raw + "'; defaulting to console");
-                yield RunAs.CONSOLE;
+                warn.accept("button " + id + " has unrecognized run-as '" + raw + "'; refusing");
+                yield Optional.empty();
             }
         };
     }
