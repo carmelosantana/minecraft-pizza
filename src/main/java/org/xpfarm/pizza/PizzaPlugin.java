@@ -79,7 +79,7 @@ public final class PizzaPlugin extends JavaPlugin {
         CooldownService cooldowns = new CooldownService(Clock.systemUTC());
         ActionDispatcher dispatcher = new ActionDispatcher(this, allowlist);
         BedrockBridge bridge = BedrockBridge.create(this);
-        ConsentService consent = new ConsentService(this, config.inviteTimeout());
+        ConsentService consent = new ConsentService(this, config.inviteTimeout(), bridge);
 
         // MenuService needs both renderers to route to, and each renderer needs MenuService as
         // its ButtonSink — a constructor cycle. MenuService is built first without them and
@@ -89,7 +89,7 @@ public final class PizzaPlugin extends JavaPlugin {
         MenuRenderer bedrockRenderer = new BedrockRenderer(this, menuService, bridge);
         menuService.setRenderers(chestRenderer, bedrockRenderer);
 
-        PizzaCommand pizzaCommand = new PizzaCommand(this, menuService);
+        PizzaCommand pizzaCommand = new PizzaCommand(this, menuService, consent);
         PluginCommand command = getCommand("pizza");
         if (command == null) {
             getLogger().severe("plugin.yml does not declare the 'pizza' command; /pizza will not work");

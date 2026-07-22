@@ -40,6 +40,26 @@ public interface BedrockBridge {
     boolean isAvailable();
 
     /**
+     * Shows {@code player} a two-button consent prompt ("Accept"/"Decline") with {@code title}
+     * and {@code content}, if that player can be shown one at all.
+     *
+     * <p>Expressed purely in JDK/Bukkit/{@code org.xpfarm.pizza} terms — no Cumulus type may ever
+     * appear in this signature, for the same reason the rest of this interface must stay
+     * Geyser-free (see the class-level javadoc). {@code onAccept}, {@code onDecline}, and {@code
+     * onClose} are plain {@link Runnable}s the implementation invokes from whatever the
+     * underlying form technology's own response handlers are; the caller decides what each of
+     * those means (typically settling a {@code PendingInvite}).
+     *
+     * @return {@code true} if a prompt was actually shown to {@code player} (in which case exactly
+     *     one of the three callbacks is guaranteed to eventually run, though possibly after the
+     *     player has disconnected); {@code false} if this player cannot be shown one — not a
+     *     Bedrock player, or Bedrock support unavailable — in which case none of the callbacks are
+     *     invoked and the caller must fall back to a Java-native path (chat plus a command).
+     */
+    boolean askConsent(UUID player, String title, String content,
+            Runnable onAccept, Runnable onDecline, Runnable onClose);
+
+    /**
      * Guarded factory: returns a real bridge only when the {@code floodgate} plugin is enabled,
      * otherwise {@link NoopBridge#INSTANCE}. This check — and only this check — decides whether
      * {@link FloodgateBridge}'s Geyser/Cumulus imports are ever touched.

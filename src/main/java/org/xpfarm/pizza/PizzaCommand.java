@@ -9,6 +9,7 @@
  */
 package org.xpfarm.pizza;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -19,32 +20,48 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.xpfarm.pizza.consent.ConsentService;
 
 /**
- * Handles {@code /pizza} and {@code /pizza reload}.
+ * Handles {@code /pizza}, {@code /pizza reload}, and the Java fallback for consent responses,
+ * {@code /pizza accept} and {@code /pizza decline}.
  *
  * <p>Bare {@code /pizza} opens the {@code main} menu for the calling player and requires {@code
  * pizza.use}; {@code /pizza reload} re-parses {@code config.yml} and swaps the live model in
  * {@link MenuService} without a server restart, and requires {@code pizza.reload}.
  *
- * <p>The invite accept/decline subcommands and the invite button's target picker are Task 7's
- * job, not this class's — an {@code invite: true} button press is handled by {@link MenuService}
- * as a visible no-op until then.
+ * <p>{@code /pizza accept} and {@code /pizza decline} resolve the caller's own pending travel
+ * invite via {@link ConsentService#accept(java.util.UUID)}/{@link
+ * ConsentService#decline(java.util.UUID)} — the path a Java player (who cannot receive a Cumulus
+ * form) uses instead of tapping a form button. Both require {@code pizza.invite} and reply with a
+ * friendly message, never an error or a stack trace, when the caller has no pending invite.
  */
 final class PizzaCommand implements CommandExecutor, TabCompleter {
 
     private final PizzaPlugin plugin;
     private final MenuService menuService;
+    private final ConsentService consentService;
 
-    PizzaCommand(PizzaPlugin plugin, MenuService menuService) {
+    PizzaCommand(PizzaPlugin plugin, MenuService menuService, ConsentService consentService) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.menuService = Objects.requireNonNull(menuService, "menuService");
+        this.consentService = Objects.requireNonNull(consentService, "consentService");
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length >= 1 && "reload".equalsIgnoreCase(args[0])) {
-            return handleReload(sender);
+        if (args.length >= 1) {
+            String sub = args[0].toLowerCase(Locale.ROOT);
+            switch (sub) {
+                case "reload":
+                    return handleReload(sender);
+                case "accept":
+                    return handleConsentResponse(sender, true);
+                case "decline":
+                    return handleConsentResponse(sender, false);
+                default:
+                    break;
+            }
         }
         return handleOpen(sender);
     }
@@ -72,11 +89,48 @@ final class PizzaCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    /**
+     * The Java-native fallback for a consent form's Accept/Decline buttons. {@link
+     * ConsentService#accept}/{@link ConsentService#decline} report whether a pending invite
+     * actually existed, so a stray {@code /pizza accept} with nothing pending — including one that
+     * arrives after the invite already resolved some other way — gets a friendly reply instead of
+     * silence or an error.
+     */
+    private boolean handleConsentResponse(CommandSender sender, boolean accept) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only a player can respond to a Pizza invite.", NamedTextColor.RED));
+            return true;
+        }
+        if (!player.hasPermission("pizza.invite")) {
+            player.sendMessage(Component.text("You do not have permission to do that.", NamedTextColor.RED));
+            return true;
+        }
+        boolean resolved = accept
+                ? consentService.accept(player.getUniqueId())
+                : consentService.decline(player.getUniqueId());
+        if (!resolved) {
+            player.sendMessage(Component.text("You have no pending invite.", NamedTextColor.GRAY));
+        }
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1 && sender.hasPermission("pizza.reload")) {
+        if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
-            return "reload".startsWith(partial) ? List.of("reload") : List.of();
+            List<String> options = new ArrayList<>();
+            if (sender.hasPermission("pizza.reload") && "reload".startsWith(partial)) {
+                options.add("reload");
+            }
+            if (sender.hasPermission("pizza.invite")) {
+                if ("accept".startsWith(partial)) {
+                    options.add("accept");
+                }
+                if ("decline".startsWith(partial)) {
+                    options.add("decline");
+                }
+            }
+            return options;
         }
         return List.of();
     }

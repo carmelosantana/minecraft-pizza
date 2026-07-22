@@ -36,4 +36,10 @@ public final class NoopBridge implements BedrockBridge {
     public boolean isAvailable() {
         return false;
     }
+
+    @Override
+    public boolean askConsent(UUID player, String title, String content,
+            Runnable onAccept, Runnable onDecline, Runnable onClose) {
+        return false;
+    }
 }

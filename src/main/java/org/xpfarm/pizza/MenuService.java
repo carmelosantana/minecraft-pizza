@@ -71,6 +71,13 @@ import org.xpfarm.pizza.render.MenuRenderer;
  */
 public final class MenuService implements ButtonSink, Listener {
 
+    /**
+     * Upper bound on how many online-player buttons the invite picker will ever render. A chest
+     * (six rows, 54 slots) or a Cumulus form could technically go higher, but an unbounded list is
+     * exactly the failure this cap exists to prevent — see {@link #openInvitePicker}.
+     */
+    private static final int MAX_INVITE_CANDIDATES = 45;
+
     private final Plugin plugin;
     private final BedrockBridge bridge;
     private final CooldownService cooldowns;
@@ -191,7 +198,8 @@ public final class MenuService implements ButtonSink, Listener {
 
         switch (button.action()) {
             case Action.OpenMenu openMenu -> open(player, openMenu.menuId());
-            case Action.Invite ignored -> sendInviteComingSoon(player);
+            case Action.Invite ignored -> openInvitePicker(player);
+            case Action.InvitePlayer invitePlayer -> activateInvitePlayer(player, invitePlayer);
             case Action.RunCommand ignored -> activateRunCommand(player, button);
         }
     }
@@ -289,10 +297,73 @@ public final class MenuService implements ButtonSink, Listener {
         return permission == null || permission.isBlank() || player.hasPermission(permission);
     }
 
-    private void sendInviteComingSoon(Player player) {
-        // Task 7 owns the invite accept/decline flow and the target picker. Until then, pressing
-        // this button is a visible no-op rather than a silent one.
-        sendMessage(player, "invite-coming-soon", Map.of(), "&eInvites are coming soon.");
+    /**
+     * Builds a {@link Menu} of every online player except {@code presser} — one {@link
+     * Action.InvitePlayer} button per candidate — and renders it through {@link #rendererFor},
+     * exactly like any other menu: a Bedrock presser gets a Cumulus form, a Java presser gets a
+     * chest. The world every candidate button invites to is fixed at build time to {@code
+     * presser}'s current world, per this task's own decision on where "the world" comes from when
+     * the invite button carries none itself.
+     *
+     * <p>Capped at {@link #MAX_INVITE_CANDIDATES}: never render an unbounded form. A server with
+     * more online players than the cap logs a truncation warning rather than silently dropping
+     * players with no explanation.
+     */
+    private void openInvitePicker(Player presser) {
+        String world = presser.getWorld().getName();
+
+        List<Player> candidates = new ArrayList<>();
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (!online.getUniqueId().equals(presser.getUniqueId())) {
+                candidates.add(online);
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            sendMessage(presser, "invite-no-players", Map.of(), "&eNobody else is online right now.");
+            return;
+        }
+
+        if (candidates.size() > MAX_INVITE_CANDIDATES) {
+            plugin.getLogger()
+                    .warning("invite picker for " + presser.getName() + " truncated from "
+                            + candidates.size() + " to " + MAX_INVITE_CANDIDATES
+                            + " online players");
+            candidates = candidates.subList(0, MAX_INVITE_CANDIDATES);
+        }
+
+        List<Button> buttons = new ArrayList<>();
+        for (Player candidate : candidates) {
+            buttons.add(new Button(
+                    "invite-picker." + candidate.getUniqueId(),
+                    candidate.getName(),
+                    null,
+                    null,
+                    new Action.InvitePlayer(candidate.getUniqueId(), world),
+                    RunAs.CONSOLE,
+                    List.of(),
+                    Duration.ZERO,
+                    false,
+                    false));
+        }
+
+        Menu picker = new Menu("invite-picker", "Invite a friend", "Who do you want to invite?", buttons);
+        rendererFor(presser).open(presser, picker);
+    }
+
+    /**
+     * A candidate was selected from {@link #openInvitePicker}'s menu. The candidate may have gone
+     * offline between the picker being rendered and this click resolving — {@link
+     * Bukkit#getPlayer(UUID)} is null-checked rather than assumed still connected.
+     */
+    private void activateInvitePlayer(Player presser, Action.InvitePlayer invitePlayer) {
+        Player target = Bukkit.getPlayer(invitePlayer.target());
+        if (target == null || !target.isOnline()) {
+            sendMessage(presser, "invite-target-offline", Map.of(),
+                    "&eThat player is no longer online.");
+            return;
+        }
+        consent.invite(presser, target, invitePlayer.world());
     }
 
     private void sendMessage(Player player, String key, Map<String, String> vars, String fallback) {

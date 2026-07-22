@@ -20,6 +20,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.xpfarm.pizza.render.BedrockBridge;
 
 /**
  * Tracks in-memory, un-persisted travel invites and is the only place in the plugin that may
@@ -43,15 +44,19 @@ import org.bukkit.scheduler.BukkitTask;
  * defends against is exclusively between the async resolution paths (accept, decline, timeout,
  * supersede, close), never between two concurrent calls to {@code invite}.
  *
- * <p><b>Wiring note.</b> This task builds the consent state machine, not the accept/decline
- * presentation layer. {@link #accept(UUID)} and {@link #decline(UUID)} are the public seam a
- * future command or form handler calls once a player actually taps a response; nothing in this
- * plugin's current scope invokes them yet.
+ * <p><b>Presentation.</b> {@link #invite} drives the prompt itself: it asks {@link BedrockBridge}
+ * to show the invitee a consent form, and only falls back to a chat message (resolved through
+ * {@code /pizza accept}/{@code /pizza decline}) when {@link BedrockBridge#askConsent} reports the
+ * player cannot be shown one. {@link #accept(UUID)} and {@link #decline(UUID)} are the public seam
+ * both that Java command fallback and the Bedrock form's own response handler call — nothing else
+ * in the plugin resolves an invite except through them (or {@link #forget}, for a departed
+ * player), so exactly one outcome ever wins regardless of which platform triggered it.
  */
 public final class ConsentService {
 
     private final Plugin plugin;
     private final Duration timeout;
+    private final BedrockBridge bridge;
 
     /** At most one pending invite per invitee, keyed by the invitee's UUID. */
     private final Map<UUID, PendingInvite> pendingByInvitee = new ConcurrentHashMap<>();
@@ -59,9 +64,10 @@ public final class ConsentService {
     /** The scheduled timeout task for each pending invite, keyed the same way. */
     private final Map<UUID, BukkitTask> timeoutTasks = new ConcurrentHashMap<>();
 
-    public ConsentService(Plugin plugin, Duration timeout) {
+    public ConsentService(Plugin plugin, Duration timeout, BedrockBridge bridge) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
+        this.bridge = Objects.requireNonNull(bridge, "bridge");
     }
 
     /**
@@ -69,6 +75,15 @@ public final class ConsentService {
      * invitee} already has a pending invite, that older invite is resolved as {@link
      * InviteOutcome#SUPERSEDED} first — its own inviter is told it was replaced, not that they
      * were declined.
+     *
+     * <p>Presentation is delegated to {@link BedrockBridge#askConsent}: a Bedrock invitee gets a
+     * Cumulus form whose Accept/Decline buttons resolve straight to {@link #accept(UUID)}/{@link
+     * #decline(UUID)} and whose dismissal resolves to {@link InviteOutcome#CLOSED} via the same
+     * {@link #settle} path {@link #forget} uses. When {@link BedrockBridge#askConsent} reports the
+     * player cannot be shown a form — not Bedrock, or Floodgate absent — {@code invitee} instead
+     * gets a chat prompt naming {@code /pizza accept} and {@code /pizza decline}. Either way the
+     * invite is already registered in {@link #pendingByInvitee} before the prompt is chosen, so
+     * both paths resolve the exact same {@link PendingInvite}.
      */
     public void invite(Player inviter, Player invitee, String world) {
         Objects.requireNonNull(inviter, "inviter");
@@ -90,27 +105,51 @@ public final class ConsentService {
                 .runTaskLater(plugin, () -> settle(created, InviteOutcome.TIMED_OUT), delayTicks);
         timeoutTasks.put(invId, task);
 
-        invitee.sendMessage(Component.text(
-                inviter.getName() + " invited you to travel to '" + world + "'.",
-                NamedTextColor.YELLOW));
+        String title = "Travel Invite";
+        String content = inviter.getName() + " wants you to join them in '" + world + "'.";
+        boolean shownAsForm = bridge.askConsent(invId, title, content,
+                () -> accept(invId),
+                () -> decline(invId),
+                () -> settle(created, InviteOutcome.CLOSED));
+
+        if (!shownAsForm) {
+            invitee.sendMessage(Component.text(
+                    inviter.getName() + " invited you to travel to '" + world
+                            + "'. Type /pizza accept or /pizza decline.",
+                    NamedTextColor.YELLOW));
+        }
         inviter.sendMessage(Component.text(
                 "Invite sent to " + invitee.getName() + ".", NamedTextColor.GRAY));
     }
 
-    /** Accepts {@code invitee}'s current pending invite, if it still has one. */
-    public void accept(UUID invitee) {
+    /**
+     * Accepts {@code invitee}'s current pending invite, if it still has one.
+     *
+     * @return {@code true} if a pending invite existed and this call resolved it; {@code false} if
+     *     there was nothing pending (or it had already been resolved by another racer a moment
+     *     earlier) — the signal a caller like {@code /pizza accept} uses to reply with a friendly
+     *     "you have no pending invite" instead of silently doing nothing.
+     */
+    public boolean accept(UUID invitee) {
         PendingInvite invite = pendingByInvitee.get(Objects.requireNonNull(invitee, "invitee"));
-        if (invite != null) {
-            settle(invite, InviteOutcome.ACCEPTED);
+        if (invite == null) {
+            return false;
         }
+        return settle(invite, InviteOutcome.ACCEPTED);
     }
 
-    /** Declines {@code invitee}'s current pending invite, if it still has one. */
-    public void decline(UUID invitee) {
+    /**
+     * Declines {@code invitee}'s current pending invite, if it still has one.
+     *
+     * @return {@code true} if a pending invite existed and this call resolved it; {@code false}
+     *     otherwise — see {@link #accept(UUID)}.
+     */
+    public boolean decline(UUID invitee) {
         PendingInvite invite = pendingByInvitee.get(Objects.requireNonNull(invitee, "invitee"));
-        if (invite != null) {
-            settle(invite, InviteOutcome.DECLINED);
+        if (invite == null) {
+            return false;
         }
+        return settle(invite, InviteOutcome.DECLINED);
     }
 
     /**
@@ -146,15 +185,18 @@ public final class ConsentService {
      * invitee — a superseded invite must never evict the newer one that replaced it), its timeout
      * task is cancelled, and the outcome is announced on the main thread. If this call loses the
      * race (someone else already resolved this exact invite), it is a complete no-op.
+     *
+     * @return whether this call won the race — mirrors {@link PendingInvite#resolve}.
      */
-    private void settle(PendingInvite invite, InviteOutcome outcome) {
+    private boolean settle(PendingInvite invite, InviteOutcome outcome) {
         if (!invite.resolve(outcome)) {
-            return;
+            return false;
         }
         UUID invId = invite.invitee();
         pendingByInvitee.remove(invId, invite);
         cancelTimeout(invId);
         onMainThread(() -> announce(invite, outcome));
+        return true;
     }
 
     private void cancelTimeout(UUID invitee) {

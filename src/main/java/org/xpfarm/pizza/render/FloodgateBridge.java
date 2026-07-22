@@ -11,6 +11,7 @@ package org.xpfarm.pizza.render;
 
 import java.util.Objects;
 import java.util.UUID;
+import org.geysermc.cumulus.form.ModalForm;
 import org.geysermc.floodgate.api.FloodgateApi;
 
 /**
@@ -48,5 +49,58 @@ final class FloodgateBridge implements BedrockBridge {
     @Override
     public boolean isAvailable() {
         return true;
+    }
+
+    /**
+     * Builds a Cumulus {@code ModalForm} (two buttons: "Accept"/"Decline") and sends it to {@code
+     * player}, routing the response back through the supplied callbacks.
+     *
+     * <p>Cumulus 1.1.2's {@link org.geysermc.cumulus.response.ModalFormResponse#clickedFirst()}
+     * reports which of the two buttons was pressed; {@code clickedFirst() == true} is "Accept"
+     * (button1), otherwise "Decline" (button2). {@code closedResultHandler} maps straight onto
+     * {@code onClose} — Floodgate fires it both for an explicit dismissal and, per confirmed
+     * Floodgate/Geyser behaviour, from {@code PlayerQuitEvent} if the player disconnects with the
+     * form still open. None of the three callbacks dereference a {@link
+     * org.bukkit.entity.Player} directly here; they are opaque {@link Runnable}s supplied by the
+     * caller (see {@code ConsentService}), which is itself careful to only touch a player by
+     * {@link UUID} lookup with a null-check.
+     *
+     * <p>{@link FloodgateApi#isFloodgatePlayer(UUID)} is re-checked immediately before {@code
+     * sendForm}, exactly like {@link BedrockRenderer#open}: {@code FloodgateApi#sendForm} silently
+     * returns {@code true} for a Java player's UUID, so an unchecked send would look successful
+     * while doing nothing and the invitee would never see a prompt of any kind.
+     */
+    @Override
+    public boolean askConsent(UUID player, String title, String content,
+            Runnable onAccept, Runnable onDecline, Runnable onClose) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(content, "content");
+        Objects.requireNonNull(onAccept, "onAccept");
+        Objects.requireNonNull(onDecline, "onDecline");
+        Objects.requireNonNull(onClose, "onClose");
+
+        ModalForm form = ModalForm.builder()
+                .title(title)
+                .content(content)
+                .button1("Accept")
+                .button2("Decline")
+                .validResultHandler(response -> {
+                    if (response.clickedFirst()) {
+                        onAccept.run();
+                    } else {
+                        onDecline.run();
+                    }
+                })
+                .closedResultHandler(onClose)
+                .build();
+
+        // Checked immediately before sendForm, per class: FloodgateApi#sendForm silently returns
+        // true for a Java player's UUID, so an unchecked send would look successful while doing
+        // nothing.
+        if (!isBedrock(player)) {
+            return false;
+        }
+        return api.sendForm(player, form);
     }
 }

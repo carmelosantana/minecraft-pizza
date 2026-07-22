@@ -9,6 +9,8 @@
  */
 package org.xpfarm.pizza.menu;
 
+import java.util.UUID;
+
 /**
  * What a button does when pressed. Every button has exactly one action; the config parser rejects
  * buttons with zero or more than one.
@@ -18,5 +20,14 @@ public sealed interface Action {
 
     record RunCommand(String command) implements Action {}
 
+    /** The {@code invite: true} button, pressed by the future inviter — opens the target picker. */
     record Invite() implements Action {}
+
+    /**
+     * One candidate in the target picker {@code Invite} opens: pressing it invites {@code target}
+     * to {@code world}. Never produced by {@link org.xpfarm.pizza.config.ConfigParser} — a config
+     * author cannot name a specific player in {@code config.yml} — only synthesised at press time
+     * by {@code MenuService}'s picker, one instance per online candidate.
+     */
+    record InvitePlayer(UUID target, String world) implements Action {}
 }

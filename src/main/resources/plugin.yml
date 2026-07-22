@@ -16,7 +16,7 @@ softdepend: [floodgate]
 commands:
   pizza:
     description: Open the Pizza menu
-    usage: /<command> [reload]
+    usage: /<command> [reload|accept|decline]
     aliases: [menu, order]
 
 permissions:
