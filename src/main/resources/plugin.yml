@@ -1,0 +1,34 @@
+name: Pizza
+version: '${project.version}'
+main: org.xpfarm.pizza.PizzaPlugin
+api-version: '26.1'
+author: Carmelo Santana
+website: https://xpfarm.org
+description: Touch-friendly in-game menu that runs everyday xpfarm tasks for younger players
+
+# Floodgate is declared soft so Bedrock form rendering activates when it is present and the plugin
+# still enables when it is not. It is a compile-time `provided` dependency, never shaded; the only
+# class importing org.geysermc.* is instantiated behind a runtime isPluginEnabled guard.
+softdepend: [floodgate]
+
+# Every other xpfarm plugin this menu drives is reached by command dispatch, not by API, so none of
+# them are declared here. A missing plugin costs a button, not startup.
+commands:
+  pizza:
+    description: Open the Pizza menu
+    usage: /<command> [reload]
+    aliases: [menu, order]
+
+permissions:
+  pizza.use:
+    description: Open the Pizza menu
+    default: true
+  pizza.invite:
+    description: Invite another player to travel to a world with you
+    default: true
+  pizza.staff:
+    description: Access the staff panel
+    default: op
+  pizza.reload:
+    description: Reload the Pizza configuration
+    default: op

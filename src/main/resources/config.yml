@@ -1,0 +1,124 @@
+# Pizza — the entire menu is data. Adding a plugin to the menu is a config edit, never a release.
+#
+# A button is: label, optional image, optional permission, and exactly one action —
+#   open:    name of another menu
+#   command: a command string to dispatch
+#   invite:  true, to start the consent-gated travel invite flow
+#
+# A command button may also carry:
+#   run-as:   console | player | player-elevated   (default: console)
+#   grant:    list of permission nodes, required by and valid only for player-elevated
+#   cooldown: duration string, per-player and per-button, held in memory
+#   worlds:   true, to expand into one button per entry in allowed-worlds, substituting %world%
+#
+# Placeholders: %player% (the player who pressed the button), %target%, %world%, %time%.
+#
+# Only commands whose root appears in command-allowlist below can ever be dispatched. That is an
+# allowlist rather than a denylist on purpose: on a server whose users are children, a typo in this
+# file must fail closed rather than reach something destructive.
+
+menus:
+  main:
+    title: '&6Pizza Menu'
+    content: What do you want to do?
+    buttons:
+      - label: My Starter Kit
+        image: { type: path, data: 'textures/items/apple' }
+        open: kit
+      - label: Cool Items
+        image: { type: path, data: 'textures/items/diamond' }
+        open: catalog
+      - label: Travel
+        image: { type: path, data: 'textures/items/ender_pearl' }
+        open: travel
+      - label: Staff
+        permission: pizza.staff
+        open: staff
+
+  kit:
+    title: Starter Kit
+    content: Everything you need to get going.
+    buttons:
+      - label: Claim my kit
+        run-as: console
+        command: starterpack give %player%
+        cooldown: 24h
+      - label: Put my armour on
+        run-as: console
+        command: starterpack equip %player%
+        cooldown: 5m
+
+  catalog:
+    title: Cool Items
+    content: Pick something to take with you.
+    buttons:
+      - label: Magic Carpet
+        run-as: console
+        command: carpet give %player%
+        cooldown: 1h
+      - label: Super Trash
+        run-as: console
+        command: supertrash give %player% 1
+        cooldown: 24h
+
+  travel:
+    title: Travel
+    content: Where do you want to go?
+    buttons:
+      # worlds: true expands this single entry into one button per allowed world.
+      # /worldcrud teleport needs a player sender but defaults its permission to op, so the node is
+      # granted for exactly the duration of one dispatch and removed in a finally block.
+      - label: 'Go to %world%'
+        worlds: true
+        run-as: player-elevated
+        grant: [worldcrud.teleport]
+        command: worldcrud teleport %world%
+      - label: Invite a friend
+        permission: pizza.invite
+        invite: true
+
+  staff:
+    title: Staff Panel
+    content: Handy controls. Nothing here is destructive.
+    buttons:
+      - label: Give everyone a starter kit
+        permission: pizza.staff
+        run-as: console
+        command: starterpack give %target%
+        each-online: true
+      - label: Make it daytime
+        permission: pizza.staff
+        run-as: console
+        command: time set day
+      - label: Clear the weather
+        permission: pizza.staff
+        run-as: console
+        command: weather clear
+
+# Worlds offered by the travel menu. A world absent from this list is unreachable through Pizza
+# even if it exists on the server.
+allowed-worlds:
+  - world
+  - world_nether
+  - world_the_end
+
+# Permitted command roots. A button whose root is missing here is refused at config load, logged,
+# and omitted from the rendered menu. Destructive roots are unreachable by omission, not by rule.
+command-allowlist:
+  - starterpack
+  - carpet
+  - supertrash
+  - worldcrud
+  - time
+  - weather
+
+# How long an invited player has to answer before the invite expires on its own. Pizza never
+# assumes a form callback will arrive.
+invite-timeout: 60s
+
+messages:
+  cooldown: '&eYou can do that again in %time%.'
+  invite-sent: '&aAsked %target% if they want to come along.'
+  invite-expired: '&e%target% did not answer in time.'
+  invite-declined: '&e%target% said no thanks.'
+  no-permission: "&cThat button isn't for you."
