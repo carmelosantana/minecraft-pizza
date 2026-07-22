@@ -298,7 +298,7 @@ final class DurationParserTest {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `mvn --batch-mode --no-transfer-progress test -Dtest='ConfigParserTest+DurationParserTest'`
+Run: `mvn --batch-mode --no-transfer-progress test -Dtest='ConfigParserTest,DurationParserTest'`
 Expected: FAIL — compilation error, classes do not exist.
 
 - [ ] **Step 3: Implement the model records, `DurationParser`, then `ConfigParser`**
@@ -310,7 +310,7 @@ Resolve `open` targets in a second pass, after every menu id is known.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `mvn --batch-mode --no-transfer-progress test -Dtest='ConfigParserTest+DurationParserTest'`
+Run: `mvn --batch-mode --no-transfer-progress test -Dtest='ConfigParserTest,DurationParserTest'`
 Expected: PASS, all tests green.
 
 - [ ] **Step 5: Commit**
@@ -542,7 +542,7 @@ final class CooldownServiceTest {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `mvn --batch-mode --no-transfer-progress test -Dtest='CommandAllowlistTest+PlaceholdersTest+CooldownServiceTest'`
+Run: `mvn --batch-mode --no-transfer-progress test -Dtest='CommandAllowlistTest,PlaceholdersTest,CooldownServiceTest'`
 Expected: FAIL — classes do not exist.
 
 - [ ] **Step 3: Implement the four classes**
@@ -557,7 +557,7 @@ string, then branches on `RunAs` per the contract above.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `mvn --batch-mode --no-transfer-progress test -Dtest='CommandAllowlistTest+PlaceholdersTest+CooldownServiceTest'`
+Run: `mvn --batch-mode --no-transfer-progress test -Dtest='CommandAllowlistTest,PlaceholdersTest,CooldownServiceTest'`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
