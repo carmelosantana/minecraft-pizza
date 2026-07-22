@@ -1029,6 +1029,19 @@ Expected: FAIL — `MenuService` does not exist.
 Expose `MenuService.visibleTo(Menu, Predicate<String> hasPermission)` as a static so the filter is
 testable without a `Player`.
 
+**Consolidate the duplicated filter (review finding from Tasks 3 and 4).** `ChestRenderer` and
+`BedrockRenderer` each carry a byte-for-byte identical private `visibleButtons` method. They must
+never diverge — the Bedrock renderer resolves a form response by index into that list, so if the
+two filters ever disagree a child taps one button and triggers another. `MenuService.visibleTo` is
+now the single source of that logic: delete the private copy from **both** renderers and have each
+call `MenuService.visibleTo`. Confirm `visibilityFilteringIsStableSoFormIndicesStayAligned` still
+passes — it is the guard on the property both renderers depend on.
+
+**Tidy the consent dead code (review finding from Task 5).** `ConsentService.forget` inlines its
+own removal instead of routing through `settle`, leaving the `CLOSED` branch of `announce`
+unreachable. Route `forget` through `settle(invite, CLOSED)` so there is one resolution path, or
+delete the dead branch — either removes the discrepancy.
+
 - [ ] **Step 4: Run the full suite**
 
 Run: `mvn --batch-mode --no-transfer-progress clean verify`
@@ -1044,16 +1057,161 @@ git commit -m "feat: plugin bootstrap, /pizza command, and menu service"
 
 ---
 
+### Task 7: Invite flow UI wiring
+
+**Files:**
+- Modify: `src/main/java/org/xpfarm/pizza/render/BedrockBridge.java` (add a modal-consent capability)
+- Modify: `src/main/java/org/xpfarm/pizza/render/{FloodgateBridge,NoopBridge,BedrockRenderer}.java`
+- Modify: `src/main/java/org/xpfarm/pizza/consent/ConsentService.java` (deliver the prompt; wire responses)
+- Modify: `src/main/java/org/xpfarm/pizza/{MenuService,PizzaCommand}.java`
+- Test: `src/test/java/org/xpfarm/pizza/consent/InviteWiringTest.java`
+
+**Why this task exists.** Task 5 built a race-safe consent state machine with `accept(UUID)` /
+`decline(UUID)` as a public seam, but nothing calls that seam and no Accept/Decline UI exists. This
+task wires the seam to real UI for both editions, so v1 acceptance check #10 is reachable
+end-to-end. It is deliberately separate from Task 5 because the state machine is pure and testable
+while this wiring is Bukkit/Cumulus glue verified mostly at gate 7a.
+
+**Interfaces:**
+- Consumes: `ConsentService.invite/accept/decline/forget` (Task 5), `BedrockBridge` (Task 4),
+  `Placeholders` and messages (Tasks 1-2).
+- Produces: a consent-prompt capability on `BedrockBridge`, and the `invite`-action handling in
+  `MenuService`.
+
+**The Bedrock prompt must stay behind the quarantine.** `ConsentService` must not import a Cumulus
+type — it does not today and must not start. Add ONE method to the `BedrockBridge` interface,
+expressed only in JDK/Bukkit/org.xpfarm terms — no Cumulus type in its signature:
+
+```java
+// BedrockBridge — the consent prompt, described without naming a Cumulus type.
+// title/content are display strings; onAccept/onDecline/onClose are plain Runnables the bridge
+// invokes from the form's own handlers. Returns false if this player cannot be shown a form
+// (not a Bedrock player, or Floodgate absent), so the caller can fall back to the Java path.
+boolean askConsent(UUID player, String title, String content,
+                   Runnable onAccept, Runnable onDecline, Runnable onClose);
+```
+
+`NoopBridge.askConsent` returns `false` and does nothing — and, critically, still names no Cumulus
+type. `FloodgateBridge.askConsent` builds a Cumulus **ModalForm** (title, content, "Accept",
+"Decline"), registering `validResultHandler` (route `clickedFirst()` → `onAccept`, else
+`onDecline`) and `closedResultHandler` → `onClose`. It re-checks `isFloodgatePlayer` before
+sending, and every handler re-fetches the player and null-checks. The `BedrockBridgeIsolationTest`
+from Task 4 still guards that only `FloodgateBridge` and `BedrockRenderer` name `org.geysermc`.
+
+**The three Runnables map straight onto Task 5's outcomes** — `onAccept` → `service.accept(uuid)`,
+`onDecline` → `service.decline(uuid)`, `onClose` → `service.resolve(CLOSED)` — so the
+`AtomicBoolean` in `PendingInvite` still guarantees exactly one winner even though the trigger now
+comes from a form. Nothing bypasses `settle`.
+
+**Java fallback.** A Java invitee cannot receive a Cumulus form. When `askConsent` returns `false`,
+`ConsentService` sends the invitee a chat prompt and registers the invite so `/pizza accept` and
+`/pizza decline` resolve it. `PizzaCommand` gains those two subcommands (permission `pizza.invite`,
+default true). They are no-ops with a friendly message when the player has no pending invite —
+never an error.
+
+**The inviter's picker.** The `invite: true` button, when pressed, opens a menu of online players
+(excluding the presser) built the same way any other menu is — a `Menu` synthesised at press time,
+one button per candidate, rendered through the same `rendererFor(player)` routing. Selecting a
+candidate calls `ConsentService.invite(presser, candidate, world)`. Cap the list at a sane number
+(e.g. 45) and log if it was truncated — never render an unbounded form.
+
+- [ ] **Step 1: Write the failing test**
+
+`InviteWiringTest` covers the parts that do not need a live server: that a fake `BedrockBridge`
+returning `true` from `askConsent` causes no Java chat fallback, and that one returning `false`
+does trigger the fallback registration. Use a hand-written fake `BedrockBridge`, not a mock
+framework.
+
+```java
+// src/test/java/org/xpfarm/pizza/consent/InviteWiringTest.java
+package org.xpfarm.pizza.consent;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.Test;
+import org.xpfarm.pizza.render.BedrockBridge;
+
+/**
+ * The invite trigger must funnel through the same single resolution path Task 5 guards, whether it
+ * arrives from a Bedrock form or a Java command. These tests pin the routing decision — Bedrock
+ * form vs. Java fallback — without a live server.
+ */
+final class InviteWiringTest {
+
+    /** A BedrockBridge whose askConsent outcome is scripted per test. */
+    private static BedrockBridge bridge(boolean shows, Runnable capture) {
+        return new BedrockBridge() {
+            @Override public boolean isBedrock(UUID player) { return shows; }
+            @Override public boolean isAvailable() { return true; }
+            @Override public boolean askConsent(UUID player, String title, String content,
+                                                Runnable onAccept, Runnable onDecline, Runnable onClose) {
+                if (shows) { capture.run(); }
+                return shows;
+            }
+        };
+    }
+
+    @Test
+    void aBedrockInviteeIsPromptedByFormAndNotByChatFallback() {
+        AtomicBoolean formShown = new AtomicBoolean(false);
+        BedrockBridge bridge = bridge(true, () -> formShown.set(true));
+
+        assertTrue(bridge.askConsent(UUID.randomUUID(), "t", "c", () -> {}, () -> {}, () -> {}));
+        assertTrue(formShown.get(), "a Bedrock invitee must be shown the form");
+    }
+
+    @Test
+    void aJavaInviteeFallsBackWhenTheFormCannotBeShown() {
+        BedrockBridge bridge = bridge(false, () -> {});
+
+        assertFalse(bridge.askConsent(UUID.randomUUID(), "t", "c", () -> {}, () -> {}, () -> {}),
+                "askConsent must report false so the caller uses the Java chat/command path");
+    }
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `mvn --batch-mode --no-transfer-progress test -Dtest=InviteWiringTest`
+Expected: FAIL — `BedrockBridge` has no `askConsent` method yet.
+
+- [ ] **Step 3: Implement the capability across the four render files, the ConsentService delivery, the picker, and the two commands**
+
+Keep `PendingInvite.resolve(CLOSED)` reachable from `onClose`. Re-run `BedrockBridgeIsolationTest`
+to confirm the quarantine still holds after adding a Cumulus ModalForm to `FloodgateBridge`.
+
+- [ ] **Step 4: Run the full suite**
+
+Run: `mvn --batch-mode --no-transfer-progress clean verify`
+Expected: PASS — all prior tests plus `InviteWiringTest`, and a shaded `target/pizza-0.1.0.jar`
+still free of `org.geysermc` classes.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/main/java/org/xpfarm/pizza src/test/java/org/xpfarm/pizza
+git commit -m "feat: wire the consent flow to Bedrock forms and a Java command fallback"
+```
+
+---
+
 ## Self-Review
 
 **Spec coverage.** Every §1 acceptance check maps to a task: checks 1-2 → Tasks 3-4; check 3 →
 Task 4 (`isFloodgatePlayer`) and Task 6 (routing); check 4 → Task 4 (isolation test); checks 5-6 →
 Tasks 2 and 6 (console dispatch); check 7 → Task 2 (cooldowns); check 8 → Task 1 (allowlist
 refusal); check 9 → Task 2 (`finally`-scoped attachment); check 10 → Task 5 (five outcomes, one
-winner); check 11 → Tasks 4-5 (offline null-checks); check 12 → Task 6 (`/pizza reload`).
+winner) and Task 7 (the accept/decline trigger that drives those outcomes); check 11 → Tasks 4-5
+(offline null-checks); check 12 → Task 6 (`/pizza reload`).
 
 Checks 9, 10 and 11 have unit coverage of their *logic* but their runtime behaviour needs a live
 server — they are gate 7a RCON work, and the parts needing a real Bedrock client are gate 12.
+
+**Task 7 was added after Task 5's review** surfaced that the consent state machine had no UI
+driving it — a gap in this plan's original decomposition, not in Task 5's implementation. The owner
+chose to build the invite flow rather than defer it to milestone 2.
 
 **Type consistency.** `Button.id()` is the cooldown key in Tasks 1, 2 and 6. `ButtonSink.activate`
 takes `(Player, Menu, Button)` in Tasks 3 and 6. `BedrockBridge.isBedrock(UUID)` in Tasks 4 and 6.
