@@ -57,6 +57,7 @@ public final class ConsentService {
     private final Plugin plugin;
     private final Duration timeout;
     private final BedrockBridge bridge;
+    private final TimeoutScheduler scheduler;
 
     /** At most one pending invite per invitee, keyed by the invitee's UUID. */
     private final Map<UUID, PendingInvite> pendingByInvitee = new ConcurrentHashMap<>();
@@ -65,9 +66,46 @@ public final class ConsentService {
     private final Map<UUID, BukkitTask> timeoutTasks = new ConcurrentHashMap<>();
 
     public ConsentService(Plugin plugin, Duration timeout, BedrockBridge bridge) {
+        this(plugin, timeout, bridge, TimeoutScheduler.BUKKIT);
+    }
+
+    /**
+     * Test seam: lets a fake stand in for {@link TimeoutScheduler#BUKKIT}, the same pattern
+     * {@link org.xpfarm.pizza.dispatch.ActionDispatcher} uses for {@code CommandRunner}. Without
+     * this, {@link #invite} could never run in a unit test at all — {@code
+     * Bukkit.getScheduler().runTaskLater(...)} throws outside a live server, unconditionally, on
+     * every call, before the interesting part of the method (the {@link BedrockBridge#askConsent}
+     * wiring decision) is even reached.
+     */
+    ConsentService(Plugin plugin, Duration timeout, BedrockBridge bridge, TimeoutScheduler scheduler) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
         this.bridge = Objects.requireNonNull(bridge, "bridge");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+    }
+
+    /**
+     * Test-only accessor: whether {@code invitee} currently has a pending invite. Exists so a test
+     * can confirm {@link #invite} actually registered one without going through {@link #settle} —
+     * {@code settle} routes through {@link #onMainThread}, which touches {@code
+     * Bukkit.isPrimaryThread()} unconditionally and therefore cannot run outside a live server
+     * either. This accessor reads the same {@link #pendingByInvitee} map {@link #accept} and
+     * {@link #decline} read in production; it is not a separate source of truth.
+     */
+    boolean hasPendingInvite(UUID invitee) {
+        return pendingByInvitee.containsKey(invitee);
+    }
+
+    /**
+     * Test seam over {@code Bukkit.getScheduler().runTaskLater(...)}. Production code always uses
+     * {@link #BUKKIT}; a test substitutes a fake that returns a hand-written {@link BukkitTask}
+     * without ever touching a live server's scheduler.
+     */
+    interface TimeoutScheduler {
+        BukkitTask scheduleTimeout(Plugin plugin, Runnable task, long delayTicks);
+
+        TimeoutScheduler BUKKIT = (plugin, task, delayTicks) ->
+                Bukkit.getScheduler().runTaskLater(plugin, task, delayTicks);
     }
 
     /**
@@ -101,8 +139,8 @@ public final class ConsentService {
         pendingByInvitee.put(invId, created);
 
         long delayTicks = Math.max(1L, timeout.toMillis() / 50L);
-        BukkitTask task = Bukkit.getScheduler()
-                .runTaskLater(plugin, () -> settle(created, InviteOutcome.TIMED_OUT), delayTicks);
+        BukkitTask task = scheduler.scheduleTimeout(
+                plugin, () -> settle(created, InviteOutcome.TIMED_OUT), delayTicks);
         timeoutTasks.put(invId, task);
 
         String title = "Travel Invite";
