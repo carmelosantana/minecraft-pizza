@@ -9,7 +9,6 @@
  */
 package org.xpfarm.pizza.render;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -20,6 +19,7 @@ import org.geysermc.cumulus.form.SimpleForm;
 import org.geysermc.cumulus.response.SimpleFormResponse;
 import org.geysermc.cumulus.util.FormImage;
 import org.geysermc.floodgate.api.FloodgateApi;
+import org.xpfarm.pizza.MenuService;
 import org.xpfarm.pizza.menu.Button;
 import org.xpfarm.pizza.menu.ButtonImage;
 import org.xpfarm.pizza.menu.Menu;
@@ -35,10 +35,10 @@ import org.xpfarm.pizza.menu.Menu;
  *
  * <h2>Permission filtering</h2>
  *
- * <p>Uses the exact same filter as {@link ChestRenderer#open}: a button whose permission the
- * player lacks is dropped entirely, and the relative order of survivors is preserved. The two
- * renderers must agree on this list, since a config author only ever sees one menu definition
- * that both platforms render.
+ * <p>Uses {@link MenuService#visibleTo}, the same filter {@link ChestRenderer#open} calls: a
+ * button whose permission the player lacks is dropped entirely, and the relative order of
+ * survivors is preserved. The two renderers must agree on this list, since a config author only
+ * ever sees one menu definition that both platforms render.
  *
  * <h2>Index-based response resolution</h2>
  *
@@ -79,7 +79,7 @@ public final class BedrockRenderer implements MenuRenderer {
         Objects.requireNonNull(menu, "menu");
 
         UUID id = player.getUniqueId();
-        List<Button> visible = visibleButtons(player, menu);
+        List<Button> visible = MenuService.visibleTo(menu, player::hasPermission);
 
         SimpleForm.Builder builder = SimpleForm.builder().title(menu.title()).content(menu.content());
         for (Button button : visible) {
@@ -135,20 +135,5 @@ public final class BedrockRenderer implements MenuRenderer {
         }
         // Dismissal without a selection: no action required beyond confirming the player is
         // still connected.
-    }
-
-    /**
-     * Identical filtering to {@link ChestRenderer}'s: a button whose permission the player lacks
-     * is dropped, never shown disabled, and survivor order matches {@code menu.buttons()}.
-     */
-    private static List<Button> visibleButtons(Player player, Menu menu) {
-        List<Button> result = new ArrayList<>();
-        for (Button button : menu.buttons()) {
-            String permission = button.permission();
-            if (permission == null || permission.isBlank() || player.hasPermission(permission)) {
-                result.add(button);
-            }
-        }
-        return List.copyOf(result);
     }
 }

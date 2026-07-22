@@ -9,7 +9,6 @@
  */
 package org.xpfarm.pizza.render;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +28,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
+import org.xpfarm.pizza.MenuService;
 import org.xpfarm.pizza.menu.Button;
 import org.xpfarm.pizza.menu.ButtonImage;
 import org.xpfarm.pizza.menu.Menu;
@@ -44,9 +44,11 @@ import org.xpfarm.pizza.menu.Menu;
  * <h2>Permission filtering</h2>
  *
  * <p>A button whose permission the player lacks is omitted from the rendered inventory entirely,
- * never shown greyed out, and the relative order of the surviving buttons is preserved. The
- * filtered list built in {@link #open} is captured once per open and is the same list a click is
- * resolved against, so a button can never move between build and click.
+ * never shown greyed out, and the relative order of the surviving buttons is preserved — that
+ * filtering is {@link MenuService#visibleTo}, the single source both this class and {@link
+ * BedrockRenderer} call, so the two can never disagree about what a player sees. The filtered list
+ * built in {@link #open} is captured once per open and is the same list a click is resolved
+ * against, so a button can never move between build and click.
  *
  * <h2>State tracking</h2>
  *
@@ -83,7 +85,7 @@ public final class ChestRenderer implements MenuRenderer, Listener {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(menu, "menu");
 
-        List<Button> visible = visibleButtons(player, menu);
+        List<Button> visible = MenuService.visibleTo(menu, player::hasPermission);
         int rows = rowsFor(visible.size());
         int capacity = rows * 9;
 
@@ -164,23 +166,6 @@ public final class ChestRenderer implements MenuRenderer, Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         openMenus.remove(event.getPlayer().getUniqueId());
-    }
-
-    /**
-     * Buttons the player lacks permission for are dropped, never shown disabled. The relative
-     * order of the survivors matches {@code menu.buttons()} — the Bedrock renderer built in Task 4
-     * resolves a form response by index into this same filtered list, so the two renderers must
-     * agree on exactly what it contains.
-     */
-    private static List<Button> visibleButtons(Player player, Menu menu) {
-        List<Button> result = new ArrayList<>();
-        for (Button button : menu.buttons()) {
-            String permission = button.permission();
-            if (permission == null || permission.isBlank() || player.hasPermission(permission)) {
-                result.add(button);
-            }
-        }
-        return List.copyOf(result);
     }
 
     private static Component titleOf(Menu menu) {

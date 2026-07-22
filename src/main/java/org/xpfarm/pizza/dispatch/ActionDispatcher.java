@@ -48,6 +48,12 @@ import org.xpfarm.pizza.menu.RunAs;
  * different action is logged and skipped rather than thrown, matching how every other refusal in
  * this class behaves — this method is reachable from a menu-click handler, where an unchecked
  * exception would surface as a console stack trace in the middle of handling a click.
+ *
+ * <p>{@link #dispatch} returns {@code true} only when the command actually reached {@link
+ * CommandRunner#run}, and the value that call itself returned. Every refusal above — a
+ * non-{@code RunCommand} action, a disallowed placeholder value, an allowlist miss — returns
+ * {@code false} without running anything. This is the signal {@code MenuService} uses to decide
+ * whether a button's cooldown should start: a refused dispatch must never start one.
  */
 public final class ActionDispatcher {
 
@@ -76,7 +82,7 @@ public final class ActionDispatcher {
         this.runner = Objects.requireNonNull(runner, "runner");
     }
 
-    public void dispatch(Player actor, Button button, Map<String, String> placeholders) {
+    public boolean dispatch(Player actor, Button button, Map<String, String> placeholders) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(button, "button");
         Objects.requireNonNull(placeholders, "placeholders");
@@ -85,7 +91,7 @@ public final class ActionDispatcher {
             plugin.getLogger()
                     .warning("button " + button.id() + " has no runnable command (action is "
                             + button.action().getClass().getSimpleName() + "); refusing to dispatch");
-            return;
+            return false;
         }
 
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
@@ -96,7 +102,7 @@ public final class ActionDispatcher {
                                 + ": placeholder '" + entry.getKey() + "' has a value containing "
                                 + "whitespace or a control character, which is not permitted; refusing "
                                 + "the whole dispatch rather than substituting it");
-                return;
+                return false;
             }
         }
 
@@ -106,14 +112,14 @@ public final class ActionDispatcher {
                     .warning("refusing to run '" + resolved + "' for " + actor.getName()
                             + " (button " + button.id()
                             + "): not in command-allowlist after placeholder substitution");
-            return;
+            return false;
         }
 
-        switch (button.runAs()) {
+        return switch (button.runAs()) {
             case CONSOLE -> runner.run(Bukkit.getConsoleSender(), resolved);
             case PLAYER -> runner.run(actor, resolved);
             case PLAYER_ELEVATED -> dispatchElevated(actor, button, resolved);
-        }
+        };
     }
 
     /**
@@ -147,12 +153,12 @@ public final class ActionDispatcher {
         return false;
     }
 
-    private void dispatchElevated(Player actor, Button button, String resolved) {
+    private boolean dispatchElevated(Player actor, Button button, String resolved) {
         PermissionAttachment attachment = actor.addAttachment(plugin);
         try {
             button.grant().forEach(node -> attachment.setPermission(node, true));
             actor.recalculatePermissions();
-            runner.run(actor, resolved);
+            return runner.run(actor, resolved);
         } finally {
             actor.removeAttachment(attachment);
             actor.recalculatePermissions();

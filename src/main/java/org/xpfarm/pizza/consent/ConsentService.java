@@ -118,20 +118,24 @@ public final class ConsentService {
      * sent it as the inviter, cancelling its timeout task and resolving it to {@link
      * InviteOutcome#CLOSED} so any response that arrives after this point (a click on a stale
      * message, for example) is a guaranteed no-op rather than acting on a departed player.
+     *
+     * <p>Routed through {@link #settle} — the same single resolution path {@link #invite}, {@link
+     * #accept}, and {@link #decline} use — rather than inlining its own removal. This keeps the
+     * single-winner {@link PendingInvite#resolve(InviteOutcome)} race the only place a resolution
+     * is ever decided, and keeps the map-eviction guard in {@code settle} (never evict a newer
+     * invite that superseded this one) in force here too.
      */
     public void forget(UUID player) {
         Objects.requireNonNull(player, "player");
 
-        PendingInvite asInvitee = pendingByInvitee.remove(player);
+        PendingInvite asInvitee = pendingByInvitee.get(player);
         if (asInvitee != null) {
-            cancelTimeout(player);
-            asInvitee.resolve(InviteOutcome.CLOSED);
+            settle(asInvitee, InviteOutcome.CLOSED);
         }
 
         for (PendingInvite invite : pendingByInvitee.values()) {
-            if (invite.inviter().equals(player) && pendingByInvitee.remove(invite.invitee(), invite)) {
-                cancelTimeout(invite.invitee());
-                invite.resolve(InviteOutcome.CLOSED);
+            if (invite.inviter().equals(player)) {
+                settle(invite, InviteOutcome.CLOSED);
             }
         }
     }
