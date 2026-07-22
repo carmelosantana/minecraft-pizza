@@ -135,17 +135,48 @@ considered during planning and deferred to a later milestone.
 ## 2. Repository
 
 - [ ] Repository is `carmelosantana/minecraft-<slug>` with an SSH `origin` and `main` branch.
-- [ ] Existing user-owned worktree changes were identified and preserved.
-- [ ] No `herobrinesystems` references remain in source, metadata, workflows, remotes, or documentation.
+      **Not complete.** The local repository exists on branch `main` with one commit (`860cfd8`),
+      authored `Carmelo Santana <me@carmelosantana.com>`. Creating the GitHub repository and the
+      first push were blocked by the Claude Code permission classifier on `2026-07-22`, not by the
+      owner and not by any failing evidence — autonomy is `autonomous`, so the authorization itself
+      was already granted. No `origin` remote is configured. Resolve by granting the permission and
+      re-running the two commands recorded below, or by running them by hand.
+- [x] Existing user-owned worktree changes were identified and preserved. The working directory was
+      empty at gate 1 preflight; there was nothing to preserve.
+- [x] No `herobrinesystems` references remain in source, metadata, workflows, remotes, or documentation.
+      `rg -n 'herobrinesystems' . --hidden -g '!target/**' -g '!.git/**'` returns exactly one hit:
+      the text of the checkbox on this line. All ten sibling plugin checklists carry the identical
+      line, so this is the template's own label rather than a reference to the obsolete identity.
+
+Commands still to run for gate 2:
+
+```bash
+gh repo create carmelosantana/minecraft-pizza --public \
+   --description "Touch-friendly in-game menu that runs everyday xpfarm tasks for younger players" \
+   --homepage "https://xpfarm.org"
+git remote add origin git@github.com:carmelosantana/minecraft-pizza.git
+git push -u origin main
+```
 
 ## 3. Metadata
 
-- [ ] AGPL-3.0-or-later `LICENSE` and Maven license metadata are present and consistent.
-- [ ] `https://xpfarm.org` metadata and Carmelo Santana author metadata are present.
-- [ ] `play.xpfarm.org` is recorded as the public Minecraft server hostname where server identity is documented.
-- [ ] New work uses the `org.xpfarm` Maven group, or an existing-coordinate compatibility decision is documented.
-- [ ] Repository slug, artifact, releasable JAR, updater destination, and `plugin.yml` names are consistent.
-- [ ] No secrets committed in source, defaults, tests, logs, history, or documentation.
+- [x] AGPL-3.0-or-later `LICENSE` and Maven license metadata are present and consistent. Full
+      661-line AGPL-3.0 text in `LICENSE`; `pom.xml` `<licenses>` names "GNU Affero General Public
+      License v3.0 or later" pointing at `https://www.gnu.org/licenses/agpl-3.0.html`.
+- [x] `https://xpfarm.org` metadata and Carmelo Santana author metadata are present. `pom.xml`
+      `<url>` and `<developers>`; `plugin.yml` `author` and `website`.
+- [x] `play.xpfarm.org` is recorded as the public Minecraft server hostname where server identity is
+      documented — `README.md`, under "Playing", as the join hostname for both Java and Bedrock.
+- [x] New work uses the `org.xpfarm` Maven group. No existing-coordinate carve-out applies; this is
+      a new plugin with no prior published coordinates.
+- [x] Repository slug, artifact, releasable JAR, updater destination, and `plugin.yml` names are
+      consistent. Verified: project `<artifactId>pizza</artifactId>` (the coordinate directly under
+      `<project>`; the other `<artifactId>` matches in `pom.xml` are dependency and build-plugin
+      coordinates), `plugin.yml` `name: Pizza`, shaded JAR `pizza-0.1.0.jar`, updater destination
+      `pizza.jar`.
+- [x] No secrets committed in source, defaults, tests, logs, history, or documentation. `config.yml`
+      holds only menu structure, world names, and player-facing strings; there are no endpoints,
+      tokens, or credentials anywhere in the tree.
 
 ## 4. Compatibility
 
@@ -176,9 +207,16 @@ considered during planning and deferred to a later milestone.
 
 ## 8. CI/CD
 
-- [ ] Identical standard plugin Actions workflow is installed with the required triggers, Temurin 25 build, artifact, checksum, and release behavior.
-- [ ] Successful main Actions run is recorded before tagging.
-- [ ] Workflow permissions contain no broader access than the documented contract.
+- [x] Identical standard plugin Actions workflow is installed with the required triggers, Temurin 25
+      build, artifact, checksum, and release behavior. `.github/workflows/build.yml` is byte-identical
+      to Magic Carpet's, which carries the post-`2026-07-19` checksum remediation (bare filenames via
+      `find -printf '%f\0'`, not `target/`-prefixed paths, so downloaded release assets can actually
+      pass `sha256sum --check`).
+- [ ] Successful main Actions run is recorded before tagging. **Not this skill's to tick** — it
+      belongs to `minecraft-plugin-release` at gate 8b. No run exists yet, because nothing has been
+      pushed (see gate 2).
+- [x] Workflow permissions contain no broader access than the documented contract: `contents: write`
+      and nothing else.
 
 ## 9. Release
 
