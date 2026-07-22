@@ -23,6 +23,15 @@ import java.util.Set;
  * time, and a value that is not fully under the server operator's control (a player's display
  * name, for instance) must not be able to smuggle a second command past a check that only ever
  * looked at the template.
+ *
+ * <p>The chaining-character check inside {@code permits} ({@code ;}, {@code &&}, {@code ||}, a
+ * newline) is a second line of defence, not the primary guard: it is a small blocklist, and a
+ * blocklist inside a fail-closed allowlist layer can never enumerate every dangerous byte. The
+ * primary guard against a hostile placeholder value is upstream, in {@code ActionDispatcher},
+ * which refuses any placeholder value containing whitespace or a control character before
+ * substitution ever runs — that check is broad by character class rather than by an enumerated
+ * list of "dangerous" strings. This class's chaining check stays in place as belt-and-braces on
+ * the assembled string, but nothing here should be relied on as the sole defence.
  */
 public final class CommandAllowlist {
 
