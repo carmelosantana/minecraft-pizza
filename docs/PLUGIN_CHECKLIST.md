@@ -253,18 +253,23 @@ named owner and date.
       to Magic Carpet's, which carries the post-`2026-07-19` checksum remediation (bare filenames via
       `find -printf '%f\0'`, not `target/`-prefixed paths, so downloaded release assets can actually
       pass `sha256sum --check`).
-- [ ] Successful main Actions run is recorded before tagging. **Not this skill's to tick** — it
-      belongs to `minecraft-plugin-release` at gate 8b. No run exists yet, because nothing has been
-      pushed (see gate 2).
+- [x] Successful main Actions run is recorded before tagging. Run `29968906094` on commit `2d01b7e`
+      (`main`), `completed / success`. The tag was created on that exact verified commit, never on an
+      in-flight or red run.
 - [x] Workflow permissions contain no broader access than the documented contract: `contents: write`
       and nothing else.
 
 ## 9. Release
 
-- [ ] Semantic version matches the POM, plugin metadata, and `v<version>` tag.
-- [ ] Successful tag Actions run and GitHub release are recorded.
-- [ ] Release contains exactly one updater-matching JAR plus `SHA256SUMS.txt` and no `original-*` JAR.
-- [ ] Downloaded release assets pass `sha256sum --check SHA256SUMS.txt`.
+- [x] Semantic version matches the POM, plugin metadata, and `v<version>` tag. `pom.xml` `0.1.0`,
+      embedded `plugin.yml` `0.1.0` (Maven-filtered, no hardcoded drift), annotated tag `v0.1.0` on
+      commit `2d01b7e`.
+- [x] Successful tag Actions run and GitHub release are recorded. Tag run `29968947442`,
+      `completed / success`. Release `v0.1.0` is stable — not draft, not prerelease.
+- [x] Release contains exactly one updater-matching JAR plus `SHA256SUMS.txt` and no `original-*`
+      JAR. Downloaded assets: `pizza-0.1.0.jar`, `SHA256SUMS.txt` — exactly two, no `original-*`.
+- [x] Downloaded release assets pass `sha256sum --check SHA256SUMS.txt`. `pizza-0.1.0.jar: OK`
+      against a flat download, so the checksum manifest records bare filenames correctly.
 
 ## 10. Updater
 
