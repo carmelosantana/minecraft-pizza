@@ -108,10 +108,17 @@ public final class MenuService implements ButtonSink, Listener {
      * Wires the two renderers in after construction — see the class-level note on why this cannot
      * happen in the constructor. Must be called exactly once, before {@link #open} or {@link
      * #activate} is reachable from any registered listener or command.
+     *
+     * <p>{@code bedrockRenderer} may be {@code null} — it is, whenever Floodgate is not installed,
+     * since {@code BedrockRendererFactory} refuses to construct a real {@code BedrockRenderer} in
+     * that case (constructing one unconditionally is what force-loaded Cumulus and broke {@code
+     * onEnable} on a Floodgate-absent server; see {@code BedrockRendererFactory}'s javadoc).
+     * {@link #rendererFor} never routes to a null Bedrock renderer in practice — a Bedrock player
+     * cannot exist without Floodgate — but falls back to the chest renderer defensively regardless.
      */
     public void setRenderers(MenuRenderer chestRenderer, MenuRenderer bedrockRenderer) {
         this.chestRenderer = Objects.requireNonNull(chestRenderer, "chestRenderer");
-        this.bedrockRenderer = Objects.requireNonNull(bedrockRenderer, "bedrockRenderer");
+        this.bedrockRenderer = bedrockRenderer;
     }
 
     /**
@@ -151,10 +158,15 @@ public final class MenuService implements ButtonSink, Listener {
         return List.copyOf(result);
     }
 
-    /** A Bedrock player is never routed to the chest renderer; every other player is. */
+    /**
+     * A Bedrock player is never routed to the chest renderer; every other player is. Falls back to
+     * the chest renderer if {@code bedrockRenderer} is {@code null} (Floodgate absent) — defensive
+     * only, since {@code bridge.isAvailable()} is false in exactly that case too, so this branch is
+     * unreachable in practice: a Bedrock player cannot connect at all without Floodgate.
+     */
     public MenuRenderer rendererFor(Player player) {
         Objects.requireNonNull(player, "player");
-        if (bridge.isAvailable() && bridge.isBedrock(player.getUniqueId())) {
+        if (bridge.isAvailable() && bridge.isBedrock(player.getUniqueId()) && bedrockRenderer != null) {
             return bedrockRenderer;
         }
         return chestRenderer;

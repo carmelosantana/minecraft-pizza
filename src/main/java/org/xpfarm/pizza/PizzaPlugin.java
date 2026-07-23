@@ -32,7 +32,7 @@ import org.xpfarm.pizza.menu.Action;
 import org.xpfarm.pizza.menu.Button;
 import org.xpfarm.pizza.menu.Menu;
 import org.xpfarm.pizza.render.BedrockBridge;
-import org.xpfarm.pizza.render.BedrockRenderer;
+import org.xpfarm.pizza.render.BedrockRendererFactory;
 import org.xpfarm.pizza.render.ChestRenderer;
 import org.xpfarm.pizza.render.MenuRenderer;
 import org.yaml.snakeyaml.Yaml;
@@ -86,7 +86,10 @@ public final class PizzaPlugin extends JavaPlugin {
         // wired in afterward via setRenderers; see its class-level javadoc.
         menuService = new MenuService(this, config, bridge, cooldowns, dispatcher, consent);
         ChestRenderer chestRenderer = new ChestRenderer(this, menuService);
-        MenuRenderer bedrockRenderer = new BedrockRenderer(this, menuService, bridge);
+        // Guarded: BedrockRenderer (and therefore Cumulus) is only ever linked when Floodgate is
+        // present. See BedrockRendererFactory's javadoc for why this must never be a bare
+        // `new BedrockRenderer(...)` here again.
+        MenuRenderer bedrockRenderer = BedrockRendererFactory.create(this, menuService, bridge);
         menuService.setRenderers(chestRenderer, bedrockRenderer);
 
         PizzaCommand pizzaCommand = new PizzaCommand(this, menuService, consent);

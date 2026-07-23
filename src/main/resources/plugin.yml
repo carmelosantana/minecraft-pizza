@@ -7,8 +7,10 @@ website: https://xpfarm.org
 description: Touch-friendly in-game menu that runs everyday xpfarm tasks for younger players
 
 # Floodgate is declared soft so Bedrock form rendering activates when it is present and the plugin
-# still enables when it is not. It is a compile-time `provided` dependency, never shaded; the only
-# class importing org.geysermc.* is instantiated behind a runtime isPluginEnabled guard.
+# still enables when it is not. It is a compile-time `provided` dependency, never shaded; the two
+# classes importing org.geysermc.* (FloodgateBridge, BedrockRenderer) are only ever constructed
+# behind a runtime isPluginEnabled/bridge.isAvailable() guard (BedrockBridge.create,
+# BedrockRendererFactory.create) — never unconditionally.
 softdepend: [floodgate]
 
 # Every other xpfarm plugin this menu drives is reached by command dispatch, not by API, so none of
