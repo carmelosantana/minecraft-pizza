@@ -300,14 +300,35 @@ Not a gate. Deployment is updater pickup: a verified release plus a correct mani
 this lifecycle owes. Leaving this section entirely unticked is the normal resting state and blocks
 nothing — not release, not enrolment, not handoff.
 
-- [ ] Enrolment confirmed live and correct: release sound, manifest entry on `origin/main`, gate 10 genuinely completed.
-- [ ] Deployment evidence recorded, if and only if an operator relayed some. Otherwise note "enrolled, not known to be deployed" and leave unticked.
+- [x] Enrolment confirmed live and correct: release sound, manifest entry on `origin/main`, gate 10
+      genuinely completed. Updater manifest commit `48a0f22` on `origin/main`; release `v0.1.0` stable
+      with a checksum-verified asset. This is enrolment confirmation, not deployment confirmation.
+- [ ] Deployment evidence recorded, if and only if an operator relayed some. **None relayed** —
+      enrolled, not known to be deployed. Deployment is updater pickup on the production server's next
+      recreation, outside this toolkit's visibility. Left unticked, which is the normal resting state.
 
 ## 12. Handoff
 
-- [ ] Current-state documentation refreshed with release, CI, updater, deployment, and local pending state.
-- [ ] Known limitations, skipped checks, configuration or migration notes, rollback guidance, and follow-up owner are recorded.
-- [ ] Evidence distinguishes source commit, published tag/release, updater state, and deployed state without exposing secrets.
-- [ ] Client play-test obligation recorded with a named owner and a target date: `<owner>` / `<date>`.
-- [ ] Client play-test outcome recorded once performed, covering Java join, Bedrock join, and any form, inventory, or rendered item behavior this plugin introduces. Leave unchecked with the owner and date above until the team has run it; an unchecked box here does not block a release, but an unrecorded obligation is a gate 12 failure.
-- [ ] Public deployment reachability confirmed during that pass: `play.xpfarm.org` reaches the intended Java and Bedrock entry points.
+- [x] Current-state documentation refreshed with release, CI, updater, deployment, and local pending
+      state. `xpfarm-plugin-toolkit/CURRENT_STATE.md` commit `298d15b` (local-only handbook, never
+      pushed): releases table, the runs sentence, Deployment Status, api-version table, Local Pending
+      Changes, and a dated "Pizza v0.1.0 Handoff" section all updated.
+- [x] Known limitations, skipped checks, configuration or migration notes, rollback guidance, and
+      follow-up owner are recorded — in the CURRENT_STATE.md handoff section: the `provided`-scope
+      deviation, the intentional in-memory/fallback limitations, the un-run 7b matrix (roster 12→13),
+      rollback-by-removal, and owner Carmelo Santana.
+- [x] Evidence distinguishes source commit (`c012de3` on `main`, `v0.1.0` tagged at `2d01b7e`),
+      published tag/release (tag run `29968947442`, stable release), updater state (manifest `48a0f22`,
+      `pizza.jar`, no pin), and deployed state (unknown to this toolkit) — without exposing secrets.
+- [x] Client play-test obligation recorded with a named owner and a target date: **Carmelo Santana /
+      `2026-07-29`**, in CURRENT_STATE.md's Client Play-Test Obligation section, with seven named
+      behaviors in plugin terms (Bedrock form render, chest GUI, button dispatch, the consent flow,
+      elevated travel, Bedrock name handling, disconnect-mid-form).
+- [ ] Client play-test outcome recorded once performed, covering Java join, Bedrock join, and any
+      form, inventory, or rendered item behavior. **Not yet run** — left unchecked with the owner and
+      date above. This is Pizza's largest unverified surface: as a Bedrock-first menu plugin, almost
+      its entire UX is client-rendered and headlessly unreachable. Not a release blocker; a real
+      obligation.
+- [ ] Public deployment reachability confirmed during that pass: `play.xpfarm.org` reaches the
+      intended Java and Bedrock entry points. **Deferred to the same play-test** — folded into the
+      obligation above.
