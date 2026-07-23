@@ -12,7 +12,6 @@ package org.xpfarm.pizza.dispatch;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
@@ -237,6 +236,13 @@ final class ActionDispatcherTest {
                 "non-ASCII gamertags are legitimate Bedrock players and must be substituted normally");
     }
 
+    /**
+     * M3: a thrown command must not propagate out of {@code dispatch} at all — not just have its
+     * elevated-permission cleanup survive. Before the fix this test pinned the opposite contract
+     * (the exception propagating); {@code dispatch} now catches it, logs it, and returns {@code
+     * false}, so a misbehaving wrapped plugin cannot spam a child's click handler with a stack
+     * trace or leave the interaction hanging.
+     */
     @Test
     void elevatedGrantIsRemovedEvenWhenTheDispatchedCommandThrows() {
         CommandAllowlist allowlist = new CommandAllowlist(Set.of("worldcrud"));
@@ -247,15 +253,37 @@ final class ActionDispatcherTest {
         Button button = commandButton(
                 "main.0", "worldcrud tp %player% spawn", RunAs.PLAYER_ELEVATED, List.of("worldcrud.teleport"));
 
-        IllegalStateException thrown = assertThrows(
-                IllegalStateException.class,
-                () -> dispatcher.dispatch(player.proxy, button, Map.of("player", "Steve")));
-        assertEquals("boom", thrown.getMessage());
+        boolean dispatched = assertDoesNotThrow(
+                () -> dispatcher.dispatch(player.proxy, button, Map.of("player", "Steve")),
+                "a command that throws must be caught inside dispatch, never propagate into the "
+                        + "click handler");
 
+        assertFalse(dispatched, "a command that threw must not report as a successful dispatch");
         assertTrue(
                 player.active.isEmpty(),
                 "the elevated attachment must be removed even though the dispatched command threw");
         assertEquals(1, player.removed.size(), "removeAttachment must be called exactly once");
+    }
+
+    /**
+     * Same M3 contract on the non-elevated paths (CONSOLE/PLAYER), which go through {@code
+     * runSafely} directly rather than through {@code dispatchElevated}'s try/finally.
+     */
+    @Test
+    void nonElevatedDispatchThatThrowsDoesNotPropagateAndReturnsFalse() {
+        CommandAllowlist allowlist = new CommandAllowlist(Set.of("starterpack"));
+        RecordingRunner runner = new RecordingRunner();
+        runner.toThrow = new IllegalStateException("boom");
+        ActionDispatcher dispatcher = new ActionDispatcher(fakePlugin(), allowlist, runner);
+        FakePlayer player = new FakePlayer("Steve");
+        Button button = commandButton("main.0", "starterpack give %player%", RunAs.PLAYER, List.of());
+
+        boolean dispatched = assertDoesNotThrow(
+                () -> dispatcher.dispatch(player.proxy, button, Map.of("player", "Steve")),
+                "a thrown command on the PLAYER/CONSOLE path must not propagate out of dispatch");
+
+        assertFalse(dispatched, "a command that threw must not report as a successful dispatch");
+        assertEquals(List.of("starterpack give Steve"), runner.ran, "the runner was still invoked");
     }
 
     @Test

@@ -11,7 +11,9 @@ package org.xpfarm.pizza.dispatch;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Level;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.plugin.Plugin;
@@ -42,6 +44,12 @@ import org.xpfarm.pizza.menu.RunAs;
  *       PermissionAttachment} that is always removed in a {@code finally} block. A command that
  *       throws must not leave the player holding an elevated permission for the rest of the
  *       session.
+ *   <li>{@link CommandRunner#run} is always called through {@link #runSafely}, which catches any
+ *       {@link RuntimeException} the underlying {@code Bukkit.dispatchCommand} (or a stubbed
+ *       runner in a test) throws, logs it, and returns {@code false} instead of letting it unwind
+ *       into the caller. {@code dispatch} is reachable directly from an inventory-click or Cumulus
+ *       form-response handler, where an unchecked exception would otherwise surface as a console
+ *       stack trace and abandon the interaction mid-click for whichever child pressed the button.
  * </ul>
  *
  * <p>Only buttons whose action is {@link Action.RunCommand} are dispatchable here. A button with a
@@ -116,8 +124,8 @@ public final class ActionDispatcher {
         }
 
         return switch (button.runAs()) {
-            case CONSOLE -> runner.run(Bukkit.getConsoleSender(), resolved);
-            case PLAYER -> runner.run(actor, resolved);
+            case CONSOLE -> runSafely(Bukkit.getConsoleSender(), resolved, button, actor);
+            case PLAYER -> runSafely(actor, resolved, button, actor);
             case PLAYER_ELEVATED -> dispatchElevated(actor, button, resolved);
         };
     }
@@ -158,10 +166,34 @@ public final class ActionDispatcher {
         try {
             button.grant().forEach(node -> attachment.setPermission(node, true));
             actor.recalculatePermissions();
-            return runner.run(actor, resolved);
+            return runSafely(actor, resolved, button, actor);
         } finally {
             actor.removeAttachment(attachment);
             actor.recalculatePermissions();
+        }
+    }
+
+    /**
+     * Runs {@code command} through {@link #runner}, catching and logging any {@link
+     * RuntimeException} it throws (M3) instead of letting it propagate into whatever called {@link
+     * #dispatch} — an inventory click or Cumulus form-response handler, where an unchecked
+     * exception would otherwise print a console stack trace and abandon the interaction mid-click.
+     * The {@link RunAs#PLAYER_ELEVATED} permission-attachment cleanup in {@link
+     * #dispatchElevated}'s own {@code finally} block is unaffected: it still runs regardless of
+     * whether this method returns normally or this catch swallows an exception.
+     */
+    private boolean runSafely(CommandSender sender, String command, Button button, Player actor) {
+        try {
+            return runner.run(sender, command);
+        } catch (RuntimeException e) {
+            plugin.getLogger()
+                    .log(Level.WARNING,
+                            "command '" + command + "' threw while running for " + actor.getName()
+                                    + " (button " + button.id() + "); treating it as a failed "
+                                    + "dispatch rather than letting it propagate into the click "
+                                    + "handler",
+                            e);
+            return false;
         }
     }
 }

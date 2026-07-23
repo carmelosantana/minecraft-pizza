@@ -42,7 +42,10 @@ public final class CommandAllowlist {
         Set<String> normalized = new HashSet<>();
         for (String root : roots) {
             if (root != null) {
-                normalized.add(root.toLowerCase(Locale.ROOT));
+                // Same normalization rootOf() applies to a dispatched command's root, so a
+                // configured entry like "/StarterPack" and a dispatched "starterpack ..." agree —
+                // see ConfigParser.parseButton, which now goes through rootOf() too (M1).
+                normalized.add(rootOf(root));
             }
         }
         this.roots = Set.copyOf(normalized);

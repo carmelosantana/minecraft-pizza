@@ -51,4 +51,18 @@ final class CommandAllowlistTest {
     void isCaseInsensitiveOnTheRoot() {
         assertTrue(allowlist.permits("StarterPack give Carmelo"));
     }
+
+    /**
+     * M1: a configured root is normalized the same way {@link CommandAllowlist#rootOf} normalizes
+     * a dispatched command — leading {@code /} stripped, lowercased — so an operator who lists
+     * {@code /StarterPack} in {@code command-allowlist} still matches a bare, lowercase dispatched
+     * root. Before this fix the constructor only lowercased, never stripped the slash, so this
+     * configuration would have silently refused every matching button.
+     */
+    @Test
+    void aConfiguredRootWithALeadingSlashAndDifferentCaseStillMatches() {
+        CommandAllowlist allowlistWithSlashEntry = new CommandAllowlist(Set.of("/StarterPack"));
+
+        assertTrue(allowlistWithSlashEntry.permits("starterpack give Carmelo"));
+    }
 }

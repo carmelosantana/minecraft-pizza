@@ -19,6 +19,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import org.xpfarm.pizza.dispatch.CommandAllowlist;
 import org.xpfarm.pizza.menu.Action;
 import org.xpfarm.pizza.menu.Button;
 import org.xpfarm.pizza.menu.ButtonImage;
@@ -41,6 +43,9 @@ import org.xpfarm.pizza.menu.RunAs;
  */
 public final class ConfigParser {
 
+    /** See {@link #parseInviteTimeout(Object, Consumer)} for why this, not {@link Duration#ZERO}. */
+    private static final Duration DEFAULT_INVITE_TIMEOUT = Duration.ofSeconds(60);
+
     private ConfigParser() {}
 
     public static PizzaConfig parse(Map<String, Object> raw, Consumer<String> warn) {
@@ -48,6 +53,15 @@ public final class ConfigParser {
         Map<String, Object> root = raw == null ? Map.of() : raw;
 
         Set<String> commandAllowlist = readAllowlist(root, warn);
+
+        // Normalized the same way CommandAllowlist.rootOf() (and now CommandAllowlist's own
+        // constructor) extract a root — leading '/' stripped, lowercased — so a config author
+        // writing "StarterPack" or "/starterpack" here and "starterpack ..." on a button (or vice
+        // versa) is not silently refused at parse time only to be permitted at dispatch time, or
+        // the reverse (M1). This is purely a widening of what parse-time recognizes as matching;
+        // an unlisted root is still refused, so the allowlist stays fail-closed.
+        Set<String> allowlistRoots =
+                commandAllowlist.stream().map(CommandAllowlist::rootOf).collect(Collectors.toUnmodifiableSet());
 
         // Pass 1: every menu id must be known before any button is validated, so an `open`
         // target that is defined later in the file is not wrongly rejected as missing.
@@ -59,7 +73,7 @@ public final class ConfigParser {
         if (rawMenus != null) {
             for (Map.Entry<String, Object> entry : rawMenus.entrySet()) {
                 String menuId = entry.getKey();
-                menus.put(menuId, parseMenu(menuId, asMap(entry.getValue()), menuIds, commandAllowlist, warn));
+                menus.put(menuId, parseMenu(menuId, asMap(entry.getValue()), menuIds, allowlistRoots, warn));
             }
         }
 
@@ -88,7 +102,7 @@ public final class ConfigParser {
             String menuId,
             Map<String, Object> rawMenu,
             Set<String> menuIds,
-            Set<String> commandAllowlist,
+            Set<String> allowlistRoots,
             Consumer<String> warn) {
         if (rawMenu == null) {
             warn.accept("menu '" + menuId + "' is not a map; treating it as empty");
@@ -109,7 +123,7 @@ public final class ConfigParser {
                 warn.accept("button " + buttonId + " is not a map; refusing");
                 continue;
             }
-            parseButton(buttonId, rawButton, menuIds, commandAllowlist, warn).ifPresent(buttons::add);
+            parseButton(buttonId, rawButton, menuIds, allowlistRoots, warn).ifPresent(buttons::add);
         }
 
         return new Menu(menuId, title, content, buttons);
@@ -119,7 +133,7 @@ public final class ConfigParser {
             String id,
             Map<String, Object> raw,
             Set<String> menuIds,
-            Set<String> commandAllowlist,
+            Set<String> allowlistRoots,
             Consumer<String> warn) {
         String label = asString(raw.get("label"), "");
 
@@ -144,8 +158,12 @@ public final class ConfigParser {
             action = new Action.OpenMenu(target);
         } else if (hasCommand) {
             String command = asString(raw.get("command"), "").trim();
-            String root = command.isEmpty() ? "" : command.split("\\s+", 2)[0];
-            if (!commandAllowlist.contains(root)) {
+            // Same extraction dispatch time uses (CommandAllowlist.rootOf: strip a leading '/',
+            // lowercase), so a config author writing "/starterpack ..." or "StarterPack" in the
+            // allowlist is not refused here only to be permitted later at dispatch, or vice versa
+            // (M1) — see the class-level javadoc.
+            String root = CommandAllowlist.rootOf(command);
+            if (root.isEmpty() || !allowlistRoots.contains(root)) {
                 warn.accept("button " + id + " command root '" + root
                         + "' is not in the command-allowlist; refusing");
                 return Optional.empty();
@@ -225,15 +243,25 @@ public final class ConfigParser {
         };
     }
 
+    /**
+     * A missing or unparseable {@code invite-timeout} defaults to {@link #DEFAULT_INVITE_TIMEOUT}
+     * (60s), not {@link Duration#ZERO} (M2). {@code ConsentService.invite} computes {@code
+     * delayTicks = max(1, timeout.toMillis() / 50)}, so a zero timeout expired an invite about one
+     * tick (~50ms) after it was sent — fails safe (nobody gets moved), but confusingly so, since
+     * the invite is answerable for less time than it takes to read the prompt. Only the
+     * present-but-unparseable case warns; a simply absent key is an ordinary default, not a config
+     * mistake.
+     */
     private static Duration parseInviteTimeout(Object raw, Consumer<String> warn) {
         if (raw == null) {
-            return Duration.ZERO;
+            return DEFAULT_INVITE_TIMEOUT;
         }
         try {
             return DurationParser.parse(String.valueOf(raw));
         } catch (IllegalArgumentException e) {
-            warn.accept("invite-timeout '" + raw + "' is unparseable; defaulting to zero");
-            return Duration.ZERO;
+            warn.accept("invite-timeout '" + raw + "' is unparseable; defaulting to "
+                    + DEFAULT_INVITE_TIMEOUT.toSeconds() + "s");
+            return DEFAULT_INVITE_TIMEOUT;
         }
     }
 

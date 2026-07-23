@@ -144,4 +144,56 @@ final class ConfigParserTest {
         assertEquals("main.1", buttons.get(0).id(),
                 "rejecting button 0 must not renumber the survivor to main.0 — the id is the cooldown key");
     }
+
+    // --- M1: parse-time allowlist root matching must agree with dispatch-time CommandAllowlist ---
+
+    @Test
+    void permitsACommandWithALeadingSlashAndDifferentCaseAgainstABareAllowlistEntry() {
+        PizzaConfig cfg = parse(config("main", menu(
+                Map.of("label", "Kit", "command", "/StarterPack give %player%"))));
+
+        assertEquals(1, cfg.menus().get("main").buttons().size(),
+                "a leading slash and different case on the button's own command must not be "
+                        + "refused when the allowlist entry itself has neither (M1)");
+        assertTrue(warnings.isEmpty());
+    }
+
+    @Test
+    void permitsACommandAgainstAnAllowlistEntryThatItselfHasALeadingSlash() {
+        Map<String, Object> raw = config("main", menu(
+                Map.of("label", "Kit", "command", "starterpack give %player%")));
+        raw.put("command-allowlist", List.of("/StarterPack", "worldcrud"));
+
+        PizzaConfig cfg = parse(raw);
+
+        assertEquals(1, cfg.menus().get("main").buttons().size(),
+                "a leading slash/different case on the config allowlist entry itself must not "
+                        + "prevent it from matching a bare, lowercase command root (M1)");
+        assertTrue(warnings.isEmpty());
+    }
+
+    // --- M2: invite-timeout defaults to 60s, not ~1 tick, when missing or unparseable ---
+
+    @Test
+    void inviteTimeoutDefaultsTo60SecondsWhenAbsent() {
+        Map<String, Object> raw = config("main", menu());
+        raw.remove("invite-timeout");
+
+        PizzaConfig cfg = parse(raw);
+
+        assertEquals(Duration.ofSeconds(60), cfg.inviteTimeout());
+        assertTrue(warnings.isEmpty(), "a simply-absent invite-timeout is an ordinary default, not a config mistake");
+    }
+
+    @Test
+    void inviteTimeoutDefaultsTo60SecondsAndWarnsWhenPresentButUnparseable() {
+        Map<String, Object> raw = config("main", menu());
+        raw.put("invite-timeout", "not-a-duration");
+
+        PizzaConfig cfg = parse(raw);
+
+        assertEquals(Duration.ofSeconds(60), cfg.inviteTimeout());
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("invite-timeout")),
+                "a present-but-unparseable invite-timeout must be logged, unlike a simply-absent one");
+    }
 }
