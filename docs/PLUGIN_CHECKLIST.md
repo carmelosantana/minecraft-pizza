@@ -169,30 +169,82 @@ considered during planning and deferred to a later milestone.
 
 ## 4. Compatibility
 
-- [ ] Java 25/Paper 26.1.2 build 74 compile succeeds and `plugin.yml` uses `api-version: '26.1'`, matching the API compiled against (see `PLUGIN_LIFECYCLE.md` §4 — a lower value opts the JAR into Paper's `Commodore` bytecode rewrites).
-- [ ] Hard dependencies, soft dependencies, optional APIs, and load ordering were reviewed and declared.
-- [ ] Geyser/Floodgate/ViaVersion review covers Bedrock-safe input, UI, inventory, identity, and protocol behavior.
+- [x] Java 25/Paper 26.1.2 build 74 compile succeeds and `plugin.yml` uses `api-version: '26.1'`,
+      matching the API compiled against. `mvn clean verify` green with `maven.compiler.release` 25
+      against `io.papermc.paper:paper-api:26.1.2.build.74-stable`; gate 7a confirmed Paper loaded the
+      plugin (`Loading server plugin Pizza v0.1.0`), so the descriptor and bytecode are runtime-valid,
+      not merely compile-valid.
+- [x] Hard dependencies, soft dependencies, optional APIs, and load ordering were reviewed and
+      declared. No hard plugin dependencies — every other xpfarm plugin is reached by command
+      dispatch, so a missing one costs a button, not startup. `softdepend: [floodgate]` for load
+      ordering. Floodgate API + Cumulus are `provided` scope, never shaded (verified: `unzip -l` on
+      the shaded JAR returns no `org.geysermc` entry).
+- [x] Geyser/Floodgate/ViaVersion review covers Bedrock-safe input, UI, inventory, identity, and
+      protocol behavior. The plugin is Bedrock-first by design: native Cumulus forms for Bedrock
+      (no Java-only chat input), chest GUI for Java, and Bedrock players are never routed to the chest
+      renderer. Identity uses `isFloodgatePlayer` (handles linked accounts), never the UUID-prefix
+      test. Player-name substitution rejects whitespace/control characters only, permitting the
+      non-ASCII and comma characters Floodgate leaves in Bedrock names — so a legitimate Bedrock child
+      is never locked out. Gate 7a confirmed Geyser, Floodgate, and ViaVersion all start green
+      alongside Pizza on the Legendary stack. What a Bedrock client actually *renders* is gate 12.
 
 ## 5. External services
 
-- [ ] External integrations are disabled by default or require explicit configuration and have bounded timeouts.
-- [ ] Ollama/Umami-style external endpoints are optional and failure-tolerant when applicable.
-- [ ] Endpoint failure cannot fail server/plugin startup, and diagnostics redact secrets.
+- [x] External integrations are `none`. Pizza makes no outbound network call anywhere; the
+      whole-branch review confirmed no network or persistence code exists. Gate 5's contract therefore
+      has no surface to apply to.
+- [x] Not applicable — no Ollama/Umami or other external endpoint. Recorded as `none` at gate 1.
+- [x] Not applicable — no endpoint whose failure could affect startup; there is nothing to redact
+      because nothing external is contacted. Startup validation only reads the local command map.
 
 ## 6. Tests and build
 
-- [ ] Unit tests cover separable logic, configuration, serialization, permissions, and failure paths where applicable.
-- [ ] `PluginDescriptorTest` parses `plugin.yml` and `config.yml` with SnakeYAML and asserts `name`, `main`, a `String`-typed `api-version`, a fully-substituted `version`, every command the code looks up, every permission the code checks, and the declared soft dependencies.
-- [ ] `mvn --batch-mode --no-transfer-progress clean verify` succeeds.
-- [ ] The shaded releasable JAR and embedded `plugin.yml` were inspected; `original-*` JARs are excluded.
+- [x] Unit tests cover separable logic, configuration, serialization, permissions, and failure paths.
+      68 tests across config parsing (fail-closed validation, all seven button rules), the allowlist
+      (injection resistance, empty-list fail-closed), placeholder validation (whitespace-reject,
+      non-ASCII-permit), cooldowns (injectable clock), the consent race (200-iteration × 5-thread
+      single-winner), the Floodgate import quarantine (source scan), a real classloading test proving
+      the plugin survives Floodgate's absence, and the menu-visibility filter.
+- [x] `PluginDescriptorTest` parses `plugin.yml` and `config.yml` with SnakeYAML and asserts `name`,
+      `main`, a `String`-typed `api-version`, a fully-substituted `version`, the `pizza` command, all
+      four permission nodes the code checks (`pizza.use/invite/staff/reload`), and the `floodgate`
+      soft dependency. It also asserts `command-allowlist` ships populated (fail-closed guard).
+- [x] `mvn --batch-mode --no-transfer-progress clean verify` succeeds. Run independently in the main
+      loop, not only by subagents: `BUILD SUCCESS`, 68/68.
+- [x] The shaded releasable JAR and embedded `plugin.yml` were inspected. `target/pizza-0.1.0.jar`
+      contains only `org/xpfarm`, `META-INF`, `plugin.yml`, `config.yml` — no Paper/Bukkit/Geyser
+      classes leaked, no `original-*` shipped. Embedded `plugin.yml` shows the fully-substituted
+      version `0.1.0`, correct main class, and `api-version: '26.1'`.
 
 ## 7. Matrix
 
-- [ ] Fresh-volume [Legendary Java Minecraft Geyser Floodgate stack](https://github.com/TheRemote/Legendary-Java-Minecraft-Geyser-Floodgate) test covers every updater-managed plugin.
-- [ ] Each updater-managed plugin's manifest `enabled` value, default state, and expected fresh-volume behavior are recorded separately.
-- [ ] Paper, Geyser, Floodgate, and ViaVersion start successfully together.
-- [ ] Affected commands, permissions, persistence, and configuration reload were exercised over RCON with no server-wide hot reload.
-- [ ] Ollama and Umami unavailable-endpoint tests keep the server and plugins available when applicable.
+- [ ] Fresh-volume matrix over every updater-managed plugin — **7b, out-of-band, not required for
+      this release.** Belongs to `minecraft-plugin-matrix`, triggered by a manifest change or a
+      Paper/Geyser/Floodgate/ViaVersion bump. Left unchecked deliberately; a `dev` run does not run it.
+- [ ] Per-plugin manifest `enabled`/default-state recording — 7b, same as above.
+- [x] **7a — Paper, Geyser, Floodgate, and ViaVersion start successfully together.** Verified on a
+      fresh disposable Legendary stack: `plugins` over RCON listed all four green —
+      `floodgate`, `Geyser-Spigot`, `Pizza`, `ViaVersion`. Paper logged `Done (21.173s)!`, and the
+      Java port answered a real Minecraft protocol handshake (Paper 26.1.2, protocol 775), not just a
+      TCP connect.
+- [x] **7a — commands, permissions, and configuration reload exercised over RCON with no server-wide
+      hot reload.** `/pizza reload` re-parsed config and re-ran the startup command-root validation
+      (observed the warnings fire a second time) without a server restart. `/pizza`, `/pizza accept`,
+      `/pizza decline` from the console each returned a friendly "only a player can…" message — no
+      stack trace. The startup validation pass correctly warned that `carpet`, `starterpack`,
+      `supertrash`, `worldcrud` do not resolve on a bare stack (the wrapped plugins are not installed),
+      demonstrating the silent-dead-button mitigation; `time`/`weather` (vanilla) resolved silently.
+      No exceptions, severe errors, or leaked secrets in startup/action/reload logs.
+- [x] Not applicable — no Ollama/Umami endpoint to exercise a negative path against.
+
+**Behaviours gate 7a could not reach — carried to gate 12 as a real play-test obligation:**
+No client attaches to a headless stack, so none of the following are verified yet, and none block
+the release: (1) whether a Bedrock client actually *renders* the Cumulus form and its buttons; (2) a
+real button press dispatching a command as a player; (3) the chest GUI as drawn for a Java player;
+(4) the invite flow accept/decline over a real client, and a teleport against a live world on an
+ACCEPTED invite; (5) the scheduled invite timeout firing; (6) `isFloodgatePlayer` correctly
+identifying a real linked Bedrock account. `minecraft-plugin-handoff` records these at gate 12 with a
+named owner and date.
 
 ## 8. CI/CD
 
