@@ -273,10 +273,26 @@ named owner and date.
 
 ## 10. Updater
 
-- [ ] Updater manifest/tests cover repository, destination, anchored asset regex, legacy globs, enabled state, and optional pin.
-- [ ] Fresh install, upgrade, no-op, legacy archival, endpoint failure, and checksum failure behaviors pass.
-- [ ] Updater dry-run uses a disposable directory and never a production plugin directory.
-- [ ] Failure retains the installed JAR and default fail-open behavior permits Minecraft startup.
+- [x] Updater manifest/tests cover repository, destination, anchored asset regex, legacy globs,
+      enabled state, and optional pin. Entry committed to `carmelosantana/minecraft-plugin-updater`
+      at `48a0f22`: `repo` `carmelosantana/minecraft-pizza`, `destination` `pizza.jar` (unique across
+      all 15 entries), `asset_regex` `^pizza-[0-9].*\.jar$` (anchored, version-digit-pinned),
+      `legacy_globs` `["pizza-[0-9]*.jar"]`, `enabled` absent (defaults true), no `pin` (follows
+      latest stable — intentional). `python3 -m json.tool` clean; 11/11 updater unit tests pass.
+- [x] Fresh install, upgrade, no-op, legacy archival, endpoint failure, and checksum failure
+      behaviors pass. Pizza-specific: dry-run reported `would install v0.1.0` (asset_regex selected
+      exactly one JAR, checksum verified during download); a sandboxed real install reported
+      `installed v0.1.0` then `already current (v0.1.0)` on re-run. Manifest-independent behaviors
+      (replacement-with-backup, legacy versioned-JAR archival, endpoint/download/checksum failure
+      warn-and-continue) are covered by the updater's 11 passing unit tests.
+- [x] Updater dry-run uses a disposable directory and never a production plugin directory. All runs
+      targeted `/tmp/minecraft-plugin-updater-dry-run` and `/tmp/mpu-sandbox/*`; the real sandboxed
+      run overrode all three of `--plugins-dir`, `--state-file`, `--backup-dir` inside the sandbox,
+      never the `/minecraft` volume. Both trees discarded afterward.
+- [x] Failure retains the installed JAR and default fail-open behavior permits Minecraft startup.
+      Verified by the updater unit suite (a plugin-level failure warns and continues, leaving any
+      installed JAR untouched, without a non-zero exit unless `--strict`). The dry-run over all 15
+      entries exited 0.
 
 ## 11. Deployment
 
