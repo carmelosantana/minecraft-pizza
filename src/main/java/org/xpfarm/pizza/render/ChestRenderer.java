@@ -170,14 +170,14 @@ public final class ChestRenderer implements MenuRenderer, Listener {
 
     private static Component titleOf(Menu menu) {
         String title = menu.title();
-        return Component.text(title == null || title.isBlank() ? menu.id() : title);
+        return MenuText.java(title == null || title.isBlank() ? menu.id() : title);
     }
 
     private ItemStack itemFor(Button button) {
         ItemStack item = new ItemStack(materialFor(button));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text(button.label()));
+            meta.displayName(MenuText.java(button.label()));
             item.setItemMeta(meta);
         }
         return item;

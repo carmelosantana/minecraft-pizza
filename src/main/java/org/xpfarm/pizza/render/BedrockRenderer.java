@@ -81,7 +81,8 @@ public final class BedrockRenderer implements MenuRenderer {
         UUID id = player.getUniqueId();
         List<Button> visible = MenuService.visibleTo(menu, player::hasPermission);
 
-        SimpleForm.Builder builder = SimpleForm.builder().title(menu.title()).content(menu.content());
+        SimpleForm.Builder builder =
+                SimpleForm.builder().title(MenuText.bedrock(menu.title())).content(MenuText.bedrock(menu.content()));
         for (Button button : visible) {
             addButton(builder, button);
         }
@@ -104,9 +105,9 @@ public final class BedrockRenderer implements MenuRenderer {
         if (image != null && image.data() != null && !image.data().isBlank()) {
             // FormImage.Type.PATH, never URL: a URL image forces Geyser through a documented
             // ~1s render-delay workaround before the form can be shown.
-            builder.button(button.label(), FormImage.Type.PATH, image.data());
+            builder.button(MenuText.bedrock(button.label()), FormImage.Type.PATH, image.data());
         } else {
-            builder.button(button.label());
+            builder.button(MenuText.bedrock(button.label()));
         }
     }
 
