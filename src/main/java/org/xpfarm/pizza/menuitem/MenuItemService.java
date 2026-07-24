@@ -106,7 +106,13 @@ public final class MenuItemService {
         return pdc.has(key, PersistentDataType.BYTE);
     }
 
-    /** True iff any slot of {@code player}'s inventory holds a tagged menu item. */
+    /**
+     * True iff any slot of {@code player}'s inventory holds a tagged menu item.
+     *
+     * <p>Checks {@code getContents()} (main + hotbar) plus the off-hand slot explicitly, since
+     * {@code getContents()} does not include it. Armor slots are not checked: this item type can
+     * never be equipped there, so they are not an additional duplication vector.
+     */
     public boolean hasMenuItem(Player player) {
         Objects.requireNonNull(player, "player");
         for (ItemStack item : player.getInventory().getContents()) {
@@ -114,6 +120,6 @@ public final class MenuItemService {
                 return true;
             }
         }
-        return false;
+        return isMenuItem(player.getInventory().getItemInOffHand());
     }
 }

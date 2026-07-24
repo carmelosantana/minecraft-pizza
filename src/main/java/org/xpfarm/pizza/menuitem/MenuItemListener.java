@@ -75,6 +75,9 @@ public final class MenuItemListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOW)
     public void onInteract(PlayerInteractEvent event) {
+        if (!spec().enabled()) {
+            return;
+        }
         if (event.getHand() != EquipmentSlot.HAND) {
             return; // ignore the off-hand fire of the same right-click
         }
@@ -91,6 +94,9 @@ public final class MenuItemListener implements Listener {
 
     @EventHandler
     public void onDrop(PlayerDropItemEvent event) {
+        if (!spec().enabled()) {
+            return;
+        }
         if (items.isMenuItem(event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }
@@ -98,6 +104,9 @@ public final class MenuItemListener implements Listener {
 
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
+        if (!spec().enabled()) {
+            return;
+        }
         event.getDrops().removeIf(items::isMenuItem);
     }
 
