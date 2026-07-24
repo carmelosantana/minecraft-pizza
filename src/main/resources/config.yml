@@ -60,6 +60,18 @@ menus:
         run-as: console
         command: supertrash give %player% 1
         cooldown: 24h
+      - label: Agua de Florida
+        run-as: console
+        command: aguadeflorida give %player%
+        cooldown: 1h
+      - label: Electric Furnace
+        run-as: console
+        command: electricfurnace give %player%
+        cooldown: 24h
+      - label: Llama Companion
+        run-as: console
+        command: llama give %player%
+        cooldown: 24h
 
   travel:
     title: Travel
@@ -111,10 +123,21 @@ command-allowlist:
   - worldcrud
   - time
   - weather
+  - aguadeflorida
+  - electricfurnace
+  - llama
 
 # How long an invited player has to answer before the invite expires on its own. Pizza never
 # assumes a form callback will arrive.
 invite-timeout: 60s
+
+# The physical hotbar item that opens this menu. Given on join to anyone with pizza.use, restored
+# if lost, and cannot be dropped. Set enabled: false to turn it off. material must be a valid item.
+menu-item:
+  enabled: true
+  material: pumpkin_pie
+  name: '&6Pizza Menu'
+  slot: 8
 
 messages:
   cooldown: '&eYou can do that again in %time%.'
