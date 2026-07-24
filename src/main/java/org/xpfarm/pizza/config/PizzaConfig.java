@@ -25,7 +25,8 @@ public record PizzaConfig(
         List<String> allowedWorlds,
         Set<String> commandAllowlist,
         Duration inviteTimeout,
-        Map<String, String> messages) {
+        Map<String, String> messages,
+        MenuItemSpec menuItem) {
 
     public PizzaConfig {
         menus = menus == null ? Map.of() : Map.copyOf(menus);
@@ -33,5 +34,6 @@ public record PizzaConfig(
         commandAllowlist = commandAllowlist == null ? Set.of() : Set.copyOf(commandAllowlist);
         inviteTimeout = inviteTimeout == null ? Duration.ZERO : inviteTimeout;
         messages = messages == null ? Map.of() : Map.copyOf(messages);
+        menuItem = menuItem == null ? MenuItemSpec.disabled() : menuItem;
     }
 }

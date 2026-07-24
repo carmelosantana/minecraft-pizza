@@ -31,6 +31,8 @@ import org.xpfarm.pizza.dispatch.CooldownService;
 import org.xpfarm.pizza.menu.Action;
 import org.xpfarm.pizza.menu.Button;
 import org.xpfarm.pizza.menu.Menu;
+import org.xpfarm.pizza.menuitem.MenuItemListener;
+import org.xpfarm.pizza.menuitem.MenuItemService;
 import org.xpfarm.pizza.render.BedrockBridge;
 import org.xpfarm.pizza.render.BedrockRendererFactory;
 import org.xpfarm.pizza.render.ChestRenderer;
@@ -74,6 +76,7 @@ public final class PizzaPlugin extends JavaPlugin {
     public void onEnable() {
         PizzaConfig config = parseConfig();
         validateCommandRoots(config);
+        validateMenuItemMaterial(config);
 
         CommandAllowlist allowlist = new CommandAllowlist(config.commandAllowlist());
         CooldownService cooldowns = new CooldownService(Clock.systemUTC());
@@ -106,6 +109,10 @@ public final class PizzaPlugin extends JavaPlugin {
         // is also a Listener, for the PlayerQuitEvent cleanup below.
         Bukkit.getPluginManager().registerEvents(chestRenderer, this);
         Bukkit.getPluginManager().registerEvents(menuService, this);
+
+        MenuItemService menuItems = new MenuItemService(this);
+        MenuItemListener menuItemListener = new MenuItemListener(this, menuService, menuItems);
+        Bukkit.getPluginManager().registerEvents(menuItemListener, this);
     }
 
     /**
@@ -120,6 +127,7 @@ public final class PizzaPlugin extends JavaPlugin {
     PizzaConfig reloadPizzaConfig() {
         PizzaConfig config = parseConfig();
         validateCommandRoots(config);
+        validateMenuItemMaterial(config);
         menuService.reload(config);
         return config;
     }
@@ -178,6 +186,25 @@ public final class PizzaPlugin extends JavaPlugin {
                                 + "do nothing until the wrapped plugin is installed (or a renamed "
                                 + "subcommand is fixed)");
             }
+        }
+    }
+
+    /**
+     * Warns once, at boot and again on {@code /pizza reload}, if the configured menu-item
+     * material does not resolve to a real item while the feature is enabled. Mirrors {@link
+     * #validateCommandRoots} in shape and intent: turns a silently-dead feature (a misconfigured
+     * material makes {@link MenuItemService#create} return {@code null} and {@code giveIfMissing}
+     * give nothing, with no diagnostic) into a startup/reload warning instead.
+     */
+    private void validateMenuItemMaterial(PizzaConfig config) {
+        if (!config.menuItem().enabled()) {
+            return;
+        }
+        String material = config.menuItem().material();
+        if (MenuItemService.resolveMaterial(material).isEmpty()) {
+            getLogger()
+                    .warning("menu-item material '" + material + "' does not resolve to a valid "
+                            + "item; the menu item will not be given");
         }
     }
 }

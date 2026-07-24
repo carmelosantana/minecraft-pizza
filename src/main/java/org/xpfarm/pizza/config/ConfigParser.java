@@ -80,8 +80,9 @@ public final class ConfigParser {
         List<String> allowedWorlds = asStringList(root.get("allowed-worlds"));
         Duration inviteTimeout = parseInviteTimeout(root.get("invite-timeout"), warn);
         Map<String, String> messages = asStringMap(root.get("messages"));
+        MenuItemSpec menuItem = parseMenuItem(root.get("menu-item"), warn);
 
-        return new PizzaConfig(menus, allowedWorlds, commandAllowlist, inviteTimeout, messages);
+        return new PizzaConfig(menus, allowedWorlds, commandAllowlist, inviteTimeout, messages, menuItem);
     }
 
     /**
@@ -263,6 +264,60 @@ public final class ConfigParser {
                     + DEFAULT_INVITE_TIMEOUT.toSeconds() + "s");
             return DEFAULT_INVITE_TIMEOUT;
         }
+    }
+
+    private static final int DEFAULT_MENU_ITEM_SLOT = 8;
+    private static final String DEFAULT_MENU_ITEM_NAME = "Pizza Menu";
+
+    /**
+     * An absent {@code menu-item} section leaves the feature off ({@link MenuItemSpec#disabled()}).
+     * A present section defaults {@code enabled} to true. {@code material} validity is not checked
+     * here — only that it is non-blank; a blank material is unusable, so the feature is disabled and
+     * a warning logged (fail closed, like the rest of the parser). Slot must be 0–8 (the hotbar);
+     * anything else warns and defaults to {@value #DEFAULT_MENU_ITEM_SLOT}.
+     */
+    private static MenuItemSpec parseMenuItem(Object raw, Consumer<String> warn) {
+        Map<String, Object> map = asMap(raw);
+        if (map == null) {
+            return MenuItemSpec.disabled();
+        }
+
+        boolean enabled = map.get("enabled") == null || truthy(map.get("enabled"));
+
+        String material = asString(map.get("material"), "").trim();
+        if (enabled && material.isBlank()) {
+            warn.accept("menu-item is enabled but has a blank material; disabling the menu item");
+            enabled = false;
+        }
+
+        String name = asString(map.get("name"), "").trim();
+        if (name.isBlank()) {
+            name = DEFAULT_MENU_ITEM_NAME;
+        }
+
+        int slot = parseMenuItemSlot(map.get("slot"), warn);
+
+        return new MenuItemSpec(enabled, material, name, slot);
+    }
+
+    private static int parseMenuItemSlot(Object raw, Consumer<String> warn) {
+        if (raw == null) {
+            return DEFAULT_MENU_ITEM_SLOT;
+        }
+        int slot;
+        try {
+            slot = Integer.parseInt(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            warn.accept("menu-item slot '" + raw + "' is not a number; defaulting to "
+                    + DEFAULT_MENU_ITEM_SLOT);
+            return DEFAULT_MENU_ITEM_SLOT;
+        }
+        if (slot < 0 || slot > 8) {
+            warn.accept("menu-item slot " + slot + " is outside the hotbar (0-8); defaulting to "
+                    + DEFAULT_MENU_ITEM_SLOT);
+            return DEFAULT_MENU_ITEM_SLOT;
+        }
+        return slot;
     }
 
     private static ButtonImage parseImage(Object raw) {
