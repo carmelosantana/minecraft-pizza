@@ -31,6 +31,8 @@ import org.xpfarm.pizza.dispatch.CooldownService;
 import org.xpfarm.pizza.menu.Action;
 import org.xpfarm.pizza.menu.Button;
 import org.xpfarm.pizza.menu.Menu;
+import org.xpfarm.pizza.menuitem.MenuItemListener;
+import org.xpfarm.pizza.menuitem.MenuItemService;
 import org.xpfarm.pizza.render.BedrockBridge;
 import org.xpfarm.pizza.render.BedrockRendererFactory;
 import org.xpfarm.pizza.render.ChestRenderer;
@@ -106,6 +108,10 @@ public final class PizzaPlugin extends JavaPlugin {
         // is also a Listener, for the PlayerQuitEvent cleanup below.
         Bukkit.getPluginManager().registerEvents(chestRenderer, this);
         Bukkit.getPluginManager().registerEvents(menuService, this);
+
+        MenuItemService menuItems = new MenuItemService(this);
+        MenuItemListener menuItemListener = new MenuItemListener(this, menuService, menuItems);
+        Bukkit.getPluginManager().registerEvents(menuItemListener, this);
     }
 
     /**
