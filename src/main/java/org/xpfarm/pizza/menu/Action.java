@@ -30,4 +30,20 @@ public sealed interface Action {
      * by {@code MenuService}'s picker, one instance per online candidate.
      */
     record InvitePlayer(UUID target, String world) implements Action {}
+
+    /**
+     * A config-authored picker button: pressing it opens a menu of online players, and selecting
+     * one runs {@code command} (with {@code %target%} = the chosen player) — immediately when
+     * {@code consent} is false, or after the target accepts a consent prompt when true.
+     */
+    record Pick(String command, boolean consent, String consentPrompt) implements Action {}
+
+    /**
+     * One candidate in the picker {@link Pick} opens. Synthesised by {@code MenuService}, never by
+     * {@code ConfigParser}. Carries the origin picker button's id and cooldown so the initiator's
+     * cooldown is keyed to the picker button (not this synthetic one) and marked when a request is
+     * sent.
+     */
+    record PickTarget(UUID target, String command, boolean consent, String originButtonId,
+            java.time.Duration cooldown, String promptContent) implements Action {}
 }
