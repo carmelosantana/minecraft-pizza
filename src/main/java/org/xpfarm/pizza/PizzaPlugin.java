@@ -85,7 +85,10 @@ public final class PizzaPlugin extends JavaPlugin {
         CooldownService cooldowns = new CooldownService(Clock.systemUTC());
         ActionDispatcher dispatcher = new ActionDispatcher(this, allowlist);
         BedrockBridge bridge = BedrockBridge.create(this);
-        ConsentService consent = new ConsentService(this, config.inviteTimeout(), bridge);
+        org.xpfarm.pizza.consent.ConsentedCommandRunner consentRunner =
+                (invitee, cmd) -> dispatcher.dispatchConsoleCommand(
+                        cmd, java.util.Map.of("target", invitee.getName()), "consent-accept");
+        ConsentService consent = new ConsentService(this, config.inviteTimeout(), bridge, consentRunner);
 
         // MenuService needs both renderers to route to, and each renderer needs MenuService as
         // its ButtonSink — a constructor cycle. MenuService is built first without them and

@@ -57,6 +57,7 @@ public final class ConsentService {
     private final Plugin plugin;
     private final Duration timeout;
     private final BedrockBridge bridge;
+    private final ConsentedCommandRunner commandRunner;
     private final TimeoutScheduler scheduler;
 
     /** At most one pending invite per invitee, keyed by the invitee's UUID. */
@@ -65,8 +66,8 @@ public final class ConsentService {
     /** The scheduled timeout task for each pending invite, keyed the same way. */
     private final Map<UUID, BukkitTask> timeoutTasks = new ConcurrentHashMap<>();
 
-    public ConsentService(Plugin plugin, Duration timeout, BedrockBridge bridge) {
-        this(plugin, timeout, bridge, TimeoutScheduler.BUKKIT);
+    public ConsentService(Plugin plugin, Duration timeout, BedrockBridge bridge, ConsentedCommandRunner commandRunner) {
+        this(plugin, timeout, bridge, commandRunner, TimeoutScheduler.BUKKIT);
     }
 
     /**
@@ -77,10 +78,12 @@ public final class ConsentService {
      * every call, before the interesting part of the method (the {@link BedrockBridge#askConsent}
      * wiring decision) is even reached.
      */
-    ConsentService(Plugin plugin, Duration timeout, BedrockBridge bridge, TimeoutScheduler scheduler) {
+    ConsentService(Plugin plugin, Duration timeout, BedrockBridge bridge,
+            ConsentedCommandRunner commandRunner, TimeoutScheduler scheduler) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
         this.bridge = Objects.requireNonNull(bridge, "bridge");
+        this.commandRunner = Objects.requireNonNull(commandRunner, "commandRunner");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
@@ -123,10 +126,12 @@ public final class ConsentService {
      * invite is already registered in {@link #pendingByInvitee} before the prompt is chosen, so
      * both paths resolve the exact same {@link PendingInvite}.
      */
-    public void invite(Player inviter, Player invitee, String world) {
+    public void invite(Player inviter, Player invitee, ConsentAction action, String title, String content) {
         Objects.requireNonNull(inviter, "inviter");
         Objects.requireNonNull(invitee, "invitee");
-        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(content, "content");
 
         UUID invId = invitee.getUniqueId();
 
@@ -135,7 +140,7 @@ public final class ConsentService {
             settle(superseded, InviteOutcome.SUPERSEDED);
         }
 
-        PendingInvite created = new PendingInvite(inviter.getUniqueId(), invId, world);
+        PendingInvite created = new PendingInvite(inviter.getUniqueId(), invId, action);
         pendingByInvitee.put(invId, created);
 
         long delayTicks = Math.max(1L, timeout.toMillis() / 50L);
@@ -143,8 +148,6 @@ public final class ConsentService {
                 plugin, () -> settle(created, InviteOutcome.TIMED_OUT), delayTicks);
         timeoutTasks.put(invId, task);
 
-        String title = "Travel Invite";
-        String content = inviter.getName() + " wants you to join them in '" + world + "'.";
         boolean shownAsForm = bridge.askConsent(invId, title, content,
                 () -> accept(invId),
                 () -> decline(invId),
@@ -152,12 +155,10 @@ public final class ConsentService {
 
         if (!shownAsForm) {
             invitee.sendMessage(Component.text(
-                    inviter.getName() + " invited you to travel to '" + world
-                            + "'. Type /pizza accept or /pizza decline.",
-                    NamedTextColor.YELLOW));
+                    content + " Type /pizza accept or /pizza decline.", NamedTextColor.YELLOW));
         }
         inviter.sendMessage(Component.text(
-                "Invite sent to " + invitee.getName() + ".", NamedTextColor.GRAY));
+                "Request sent to " + invitee.getName() + ".", NamedTextColor.GRAY));
     }
 
     /**
@@ -256,7 +257,10 @@ public final class ConsentService {
      * Player-facing side effects of a settled invite. Every branch null-checks {@link
      * Bukkit#getPlayer(UUID)} before touching a player — both {@code inviter} and {@code invitee}
      * may have disconnected between the triggering event and this running. Only {@link
-     * InviteOutcome#ACCEPTED}, and only when both parties are still online, results in a teleport.
+     * InviteOutcome#ACCEPTED} acts on the invite's {@link ConsentAction}: a {@link
+     * ConsentAction.Travel} teleports the invitee to the inviter (only when both parties are still
+     * online), while a {@link ConsentAction.RunCommand} dispatches its allowlisted command as
+     * console for the consenting invitee (requiring only the invitee online).
      */
     private void announce(PendingInvite invite, InviteOutcome outcome) {
         Player inviter = Bukkit.getPlayer(invite.inviter());
@@ -264,12 +268,25 @@ public final class ConsentService {
 
         switch (outcome) {
             case ACCEPTED -> {
-                if (inviter != null && invitee != null) {
-                    invitee.teleport(inviter.getLocation());
-                    invitee.sendMessage(Component.text(
-                            "You joined " + inviter.getName() + ".", NamedTextColor.GREEN));
-                    inviter.sendMessage(Component.text(
-                            invitee.getName() + " joined you.", NamedTextColor.GREEN));
+                switch (invite.action()) {
+                    case ConsentAction.Travel travel -> {
+                        if (inviter != null && invitee != null) {
+                            invitee.teleport(inviter.getLocation());
+                            invitee.sendMessage(Component.text(
+                                    "You joined " + inviter.getName() + ".", NamedTextColor.GREEN));
+                            inviter.sendMessage(Component.text(
+                                    invitee.getName() + " joined you.", NamedTextColor.GREEN));
+                        }
+                    }
+                    case ConsentAction.RunCommand run -> {
+                        if (invitee != null) {
+                            commandRunner.run(invitee, run.command());
+                            if (inviter != null) {
+                                inviter.sendMessage(Component.text(
+                                        invitee.getName() + " accepted.", NamedTextColor.GREEN));
+                            }
+                        }
+                    }
                 }
             }
             case DECLINED -> {

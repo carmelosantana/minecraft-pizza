@@ -24,6 +24,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.xpfarm.pizza.config.PizzaConfig;
+import org.xpfarm.pizza.consent.ConsentAction;
 import org.xpfarm.pizza.consent.ConsentService;
 import org.xpfarm.pizza.dispatch.ActionDispatcher;
 import org.xpfarm.pizza.dispatch.CommandAllowlist;
@@ -375,7 +376,9 @@ public final class MenuService implements ButtonSink, Listener {
                     "&eThat player is no longer online.");
             return;
         }
-        consent.invite(presser, target, invitePlayer.world());
+        String content = presser.getName() + " wants you to join them in '" + invitePlayer.world() + "'.";
+        consent.invite(presser, target,
+                new ConsentAction.Travel(invitePlayer.world()), "Travel Invite", content);
     }
 
     private void sendMessage(Player player, String key, Map<String, String> vars, String fallback) {

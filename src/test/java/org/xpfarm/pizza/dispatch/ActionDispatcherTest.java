@@ -303,6 +303,29 @@ final class ActionDispatcherTest {
     }
 
     @Test
+    void dispatchConsoleCommandRefusesAWhitespaceTargetName() {
+        // A Bedrock gamertag with a space must never be substituted into a command line.
+        java.util.List<String> ran = new java.util.ArrayList<>();
+        ActionDispatcher d = new ActionDispatcher(fakePlugin(), new CommandAllowlist(java.util.Set.of("curse")),
+                (sender, cmd) -> { ran.add(cmd); return true; });
+        boolean ok = d.dispatchConsoleCommand("curse trigger ZP25 %target%",
+                java.util.Map.of("target", "Bad Name"), "test");
+        assertFalse(ok);
+        assertTrue(ran.isEmpty(), "must refuse before running");
+    }
+
+    @Test
+    void dispatchConsoleCommandRunsAnAllowlistedCommand() {
+        java.util.List<String> ran = new java.util.ArrayList<>();
+        ActionDispatcher d = new ActionDispatcher(fakePlugin(), new CommandAllowlist(java.util.Set.of("curse")),
+                (sender, cmd) -> { ran.add(cmd); return true; });
+        boolean ok = d.dispatchConsoleCommand("curse trigger ZP25 %target%",
+                java.util.Map.of("target", "Steve"), "test");
+        assertTrue(ok);
+        assertEquals(java.util.List.of("curse trigger ZP25 Steve"), ran);
+    }
+
+    @Test
     void nonRunCommandActionIsLoggedAndDoesNotThrow() {
         CommandAllowlist allowlist = new CommandAllowlist(Set.of("starterpack"));
         RecordingRunner runner = new RecordingRunner();

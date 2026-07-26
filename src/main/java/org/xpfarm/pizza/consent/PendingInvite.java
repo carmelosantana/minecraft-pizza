@@ -32,7 +32,7 @@ public final class PendingInvite {
 
     private final UUID inviter;
     private final UUID invitee;
-    private final String world;
+    private final ConsentAction action;
 
     private final AtomicBoolean resolved = new AtomicBoolean(false);
 
@@ -42,10 +42,10 @@ public final class PendingInvite {
     // without going through resolve() itself.
     private volatile InviteOutcome outcome;
 
-    public PendingInvite(UUID inviter, UUID invitee, String world) {
+    public PendingInvite(UUID inviter, UUID invitee, ConsentAction action) {
         this.inviter = Objects.requireNonNull(inviter, "inviter");
         this.invitee = Objects.requireNonNull(invitee, "invitee");
-        this.world = Objects.requireNonNull(world, "world");
+        this.action = Objects.requireNonNull(action, "action");
     }
 
     /**
@@ -77,7 +77,7 @@ public final class PendingInvite {
         return invitee;
     }
 
-    public String world() {
-        return world;
+    public ConsentAction action() {
+        return action;
     }
 }

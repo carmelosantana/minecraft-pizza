@@ -90,6 +90,42 @@ public final class ActionDispatcher {
         this.runner = Objects.requireNonNull(runner, "runner");
     }
 
+    /**
+     * Runs a raw allowlisted command as console, applying the same placeholder-value validation and
+     * post-substitution allowlist re-check as {@link #dispatch}. Used by the consent-accept path and
+     * the staff (no-consent) picker path, neither of which has a {@link Button}. Returns whether the
+     * command actually reached the runner.
+     */
+    public boolean dispatchConsoleCommand(String commandTemplate, Map<String, String> placeholders, String context) {
+        Objects.requireNonNull(commandTemplate, "commandTemplate");
+        Objects.requireNonNull(placeholders, "placeholders");
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            if (!isPermittedPlaceholderValue(entry.getValue())) {
+                plugin.getLogger().warning("refusing console command for " + context + ": placeholder '"
+                        + entry.getKey() + "' has whitespace or a control character");
+                return false;
+            }
+        }
+        String resolved = Placeholders.apply(commandTemplate, placeholders);
+        if (!allowlist.permits(resolved)) {
+            plugin.getLogger().warning("refusing '" + resolved + "' for " + context
+                    + ": not in command-allowlist after substitution");
+            return false;
+        }
+        try {
+            // Resolve the console sender only when a server is actually present. In production a
+            // server is always set, so this is byte-identical to calling Bukkit.getConsoleSender()
+            // directly; it is what lets the console-dispatch path be unit-tested (with a fake runner
+            // that ignores the sender) without standing up a live Bukkit singleton — the same reason
+            // CommandRunner is a seam in the first place.
+            CommandSender console = Bukkit.getServer() != null ? Bukkit.getConsoleSender() : null;
+            return runner.run(console, resolved);
+        } catch (RuntimeException e) {
+            plugin.getLogger().log(Level.WARNING, "console command '" + resolved + "' threw for " + context, e);
+            return false;
+        }
+    }
+
     public boolean dispatch(Player actor, Button button, Map<String, String> placeholders) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(button, "button");
