@@ -28,6 +28,9 @@ permissions:
   pizza.invite:
     description: Invite another player to travel to a world with you
     default: true
+  pizza.curse:
+    description: Allows initiating a consent-gated curse on another player.
+    default: true
   pizza.staff:
     description: Access the staff panel
     default: op

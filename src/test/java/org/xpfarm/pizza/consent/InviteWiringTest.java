@@ -136,9 +136,9 @@ final class InviteWiringTest {
             }
         };
 
-        ConsentService service =
-                new ConsentService(fakePlugin(), Duration.ofSeconds(60), bridge, noopScheduler());
-        service.invite(inviter, invitee, "creative");
+        ConsentService service = new ConsentService(
+                fakePlugin(), Duration.ofSeconds(60), bridge, noopRunner(), noopScheduler());
+        service.invite(inviter, invitee, new ConsentAction.Travel("creative"), "Travel Invite", "come along");
 
         assertTrue(askConsentCalled.get(), "invite() must actually call BedrockBridge.askConsent");
         assertEquals(0, inviteeMessages.get(),
@@ -174,14 +174,61 @@ final class InviteWiringTest {
             }
         };
 
-        ConsentService service =
-                new ConsentService(fakePlugin(), Duration.ofSeconds(60), bridge, noopScheduler());
-        service.invite(inviter, invitee, "creative");
+        ConsentService service = new ConsentService(
+                fakePlugin(), Duration.ofSeconds(60), bridge, noopRunner(), noopScheduler());
+        service.invite(inviter, invitee, new ConsentAction.Travel("creative"), "Travel Invite", "come along");
 
         assertEquals(1, inviteeMessages.get(), "a Java invitee must receive the chat fallback prompt");
         assertTrue(service.hasPendingInvite(inviteeId),
                 "invite() must register the invite so a later /pizza accept or /pizza decline "
                         + "(ConsentService.accept/decline) has something to resolve");
+    }
+
+    /**
+     * Drives the real {@link ConsentService#invite} with a {@link ConsentAction.RunCommand}: the new
+     * action variant must register exactly like a {@link ConsentAction.Travel} invite does, so a
+     * later {@code accept} has something to resolve and the injected {@link ConsentedCommandRunner}
+     * is the thing that would fire.
+     *
+     * <p><b>Why the runner invocation itself is not asserted here.</b> The runner is only ever
+     * called from {@link ConsentService#announce}'s {@code ACCEPTED -> RunCommand} branch, which runs
+     * inside {@link ConsentService}'s {@code onMainThread(...)} — and {@code onMainThread} calls
+     * {@code Bukkit.isPrimaryThread()} unconditionally, with no seam, which NPEs outside a live
+     * server <em>before</em> the branch (and therefore the runner) is ever reached. This is the
+     * exact same limitation the class-level javadoc documents for the ACCEPTED teleport and every
+     * other {@code announce} branch: they remain a gate-7a / RCON check, not unit-testable in this
+     * file without a live server or a second Bukkit seam this task does not add. This test therefore
+     * mirrors {@link #javaInviteeGetsAChatFallbackAndAResolvableInvite} — it confirms the RunCommand
+     * invite is registered and resolvable — rather than standing up a fragile fake {@code
+     * Bukkit.server} (which, in surefire's single reused JVM, would leak into every other test
+     * class). That the runner actually fires on accept is verified at runtime, gate 7a.
+     */
+    @Test
+    void runCommandInviteIsRegisteredAndResolvable() {
+        ConsentedCommandRunner runner = (invitee, cmd) -> true;
+
+        UUID inviteeId = UUID.randomUUID();
+        Player inviter = fakePlayer(UUID.randomUUID(), "Steve", new AtomicInteger());
+        Player invitee = fakePlayer(inviteeId, "Alex", new AtomicInteger());
+
+        BedrockBridge bridge = new BedrockBridge() {
+            @Override public boolean isBedrock(UUID player) { return false; }
+            @Override public boolean isAvailable() { return false; }
+            @Override public boolean askConsent(UUID player, String title, String content,
+                    Runnable onAccept, Runnable onDecline, Runnable onClose) {
+                return false;
+            }
+        };
+
+        ConsentService service = new ConsentService(
+                fakePlugin(), Duration.ofSeconds(60), bridge, runner, noopScheduler());
+        service.invite(inviter, invitee,
+                new ConsentAction.RunCommand("curse trigger ZP25 %target%"), "t", "c");
+
+        assertTrue(service.hasPendingInvite(inviteeId),
+                "a RunCommand invite must register just like a Travel invite so a later accept "
+                        + "(ConsentService.accept, which fires the injected runner in announce) has "
+                        + "something to resolve");
     }
 
     /**
@@ -236,6 +283,11 @@ final class InviteWiringTest {
      * A {@link ConsentService.TimeoutScheduler} that never actually schedules anything and never
      * touches {@code Bukkit}. The timeout firing is not part of what these tests check.
      */
+    /** A {@link ConsentedCommandRunner} that never runs anything; used where the accept path is not exercised. */
+    private static ConsentedCommandRunner noopRunner() {
+        return (invitee, command) -> false;
+    }
+
     private static ConsentService.TimeoutScheduler noopScheduler() {
         return (plugin, task, delayTicks) -> new BukkitTask() {
             @Override public int getTaskId() { return 0; }

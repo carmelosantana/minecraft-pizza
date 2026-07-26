@@ -22,7 +22,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.xpfarm.pizza.config.ConfigHashes;
 import org.xpfarm.pizza.config.ConfigParser;
+import org.xpfarm.pizza.config.ConfigRefreshDecision;
 import org.xpfarm.pizza.config.PizzaConfig;
 import org.xpfarm.pizza.consent.ConsentService;
 import org.xpfarm.pizza.dispatch.ActionDispatcher;
@@ -74,6 +76,7 @@ public final class PizzaPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        maybeAutoRefreshConfig();
         PizzaConfig config = parseConfig();
         validateCommandRoots(config);
         validateMenuItemMaterial(config);
@@ -82,7 +85,10 @@ public final class PizzaPlugin extends JavaPlugin {
         CooldownService cooldowns = new CooldownService(Clock.systemUTC());
         ActionDispatcher dispatcher = new ActionDispatcher(this, allowlist);
         BedrockBridge bridge = BedrockBridge.create(this);
-        ConsentService consent = new ConsentService(this, config.inviteTimeout(), bridge);
+        org.xpfarm.pizza.consent.ConsentedCommandRunner consentRunner =
+                (invitee, cmd) -> dispatcher.dispatchConsoleCommand(
+                        cmd, java.util.Map.of("target", invitee.getName()), "consent-accept");
+        ConsentService consent = new ConsentService(this, config.inviteTimeout(), bridge, consentRunner);
 
         // MenuService needs both renderers to route to, and each renderer needs MenuService as
         // its ButtonSink — a constructor cycle. MenuService is built first without them and
@@ -135,6 +141,55 @@ public final class PizzaPlugin extends JavaPlugin {
     private PizzaConfig parseConfig() {
         Map<String, Object> raw = loadRawConfig();
         return ConfigParser.parse(raw, warning -> getLogger().warning(warning));
+    }
+
+    /**
+     * Before the first parse, decide whether the on-disk config.yml is an unmodified older default
+     * that can be safely replaced with this version's default. Only replaces on a REFRESH verdict;
+     * a customized config is left untouched with a single INFO line. See {@link ConfigRefreshDecision}.
+     */
+    private void maybeAutoRefreshConfig() {
+        saveDefaultConfig(); // writes the bundled default only if config.yml is absent
+        Path path = getDataFolder().toPath().resolve("config.yml");
+        try {
+            byte[] onDisk = Files.readAllBytes(path);
+            byte[] current = ConfigHashes.currentDefaultBytes();
+            switch (ConfigRefreshDecision.decide(onDisk, current, ConfigHashes.knownHashes())) {
+                case UP_TO_DATE -> { /* nothing to do */ }
+                case REFRESH -> {
+                    Path backup = writeBackup(path, onDisk);
+                    Files.write(path, current);
+                    getLogger().info("config.yml was an unmodified older default; refreshed it to the "
+                            + "v" + getPluginMeta().getVersion() + " default. Your old file is at "
+                            + backup.getFileName());
+                }
+                case CUSTOMIZED -> getLogger().info("config.yml looks customized; leaving it as-is. New "
+                        + "default features may be missing — run /pizza config refresh to reset it "
+                        + "(your file is backed up first).");
+            }
+        } catch (IOException e) {
+            getLogger().log(Level.WARNING, "could not auto-refresh config.yml; using it as-is", e);
+        }
+    }
+
+    /**
+     * Unconditionally back up config.yml and overwrite it with this version's bundled default.
+     * Called by {@code /pizza config refresh}. Returns the backup path so the command can report it.
+     */
+    Path refreshConfigToDefault() throws IOException {
+        Path path = getDataFolder().toPath().resolve("config.yml");
+        byte[] onDisk = Files.exists(path) ? Files.readAllBytes(path) : new byte[0];
+        Path backup = writeBackup(path, onDisk);
+        Files.write(path, ConfigHashes.currentDefaultBytes());
+        reloadPizzaConfig();
+        return backup;
+    }
+
+    private Path writeBackup(Path configPath, byte[] contents) throws IOException {
+        // Live server runtime — System.currentTimeMillis is available and fine here.
+        Path backup = configPath.resolveSibling("config.yml.backup-" + System.currentTimeMillis());
+        Files.write(backup, contents);
+        return backup;
     }
 
     /** See the class-level javadoc for why this reads the file directly instead of {@link #getConfig()}. */

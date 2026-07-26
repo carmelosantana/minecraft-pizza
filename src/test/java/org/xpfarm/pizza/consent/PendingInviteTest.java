@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Test;
 final class PendingInviteTest {
 
     private PendingInvite invite() {
-        return new PendingInvite(UUID.randomUUID(), UUID.randomUUID(), "creative");
+        return new PendingInvite(
+                UUID.randomUUID(), UUID.randomUUID(), new ConsentAction.Travel("creative"));
     }
 
     @Test

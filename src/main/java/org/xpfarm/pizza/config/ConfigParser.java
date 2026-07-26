@@ -139,12 +139,13 @@ public final class ConfigParser {
         String label = asString(raw.get("label"), "");
 
         boolean hasOpen = raw.get("open") != null;
-        boolean hasCommand = raw.get("command") != null;
+        boolean hasCommand = raw.get("command") != null && raw.get("pick") == null;
         boolean hasInvite = truthy(raw.get("invite"));
+        boolean hasPick = raw.get("pick") != null;
 
-        int actionCount = (hasOpen ? 1 : 0) + (hasCommand ? 1 : 0) + (hasInvite ? 1 : 0);
+        int actionCount = (hasOpen ? 1 : 0) + (hasCommand ? 1 : 0) + (hasInvite ? 1 : 0) + (hasPick ? 1 : 0);
         if (actionCount != 1) {
-            warn.accept("button " + id + " must declare exactly one of open/command/invite, found "
+            warn.accept("button " + id + " must declare exactly one of open/command/invite/pick, found "
                     + actionCount + "; refusing");
             return Optional.empty();
         }
@@ -170,6 +171,23 @@ public final class ConfigParser {
                 return Optional.empty();
             }
             action = new Action.RunCommand(command);
+        } else if (hasPick) {
+            String pickType = asString(raw.get("pick"), "");
+            if (!"online-players".equals(pickType)) {
+                warn.accept("button " + id + " has unsupported pick '" + pickType
+                        + "' (only 'online-players'); refusing");
+                return Optional.empty();
+            }
+            String command = asString(raw.get("command"), "").trim();
+            String root = CommandAllowlist.rootOf(command);
+            if (root.isEmpty() || !allowlistRoots.contains(root)) {
+                warn.accept("button " + id + " pick command root '" + root
+                        + "' is not in the command-allowlist; refusing");
+                return Optional.empty();
+            }
+            boolean consent = truthy(raw.get("consent"));
+            String consentPrompt = asString(raw.get("consent-prompt"), "%player% wants to do that to you.");
+            action = new Action.Pick(command, consent, consentPrompt);
         } else {
             action = new Action.Invite();
         }

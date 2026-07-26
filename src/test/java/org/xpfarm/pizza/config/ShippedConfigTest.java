@@ -67,4 +67,22 @@ final class ShippedConfigTest {
         parseShipped();
         assertTrue(warnings.isEmpty(), "shipped config must parse clean: " + warnings);
     }
+
+    @Test
+    void curseButtonsAreParsedAndAllowlisted() {
+        PizzaConfig cfg = parseShipped();
+        assertTrue(cfg.commandAllowlist().contains("curse"), "curse must be allowlisted");
+
+        boolean peerConsent = cfg.menus().values().stream()
+                .flatMap(m -> m.buttons().stream())
+                .anyMatch(b -> b.action() instanceof org.xpfarm.pizza.menu.Action.Pick p
+                        && p.consent() && p.command().startsWith("curse trigger"));
+        assertTrue(peerConsent, "expected a consent-gated peer curse pick button");
+
+        boolean staffCleanse = cfg.menus().values().stream()
+                .flatMap(m -> m.buttons().stream())
+                .anyMatch(b -> b.action() instanceof org.xpfarm.pizza.menu.Action.Pick p
+                        && !p.consent() && p.command().equals("curse stop %target%"));
+        assertTrue(staffCleanse, "expected a staff cleanse pick button");
+    }
 }

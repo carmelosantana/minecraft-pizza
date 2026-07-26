@@ -24,6 +24,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.xpfarm.pizza.config.PizzaConfig;
+import org.xpfarm.pizza.consent.ConsentAction;
 import org.xpfarm.pizza.consent.ConsentService;
 import org.xpfarm.pizza.dispatch.ActionDispatcher;
 import org.xpfarm.pizza.dispatch.CommandAllowlist;
@@ -213,6 +214,8 @@ public final class MenuService implements ButtonSink, Listener {
             case Action.Invite ignored -> openInvitePicker(player);
             case Action.InvitePlayer invitePlayer -> activateInvitePlayer(player, invitePlayer);
             case Action.RunCommand ignored -> activateRunCommand(player, button);
+            case Action.Pick pick -> openTargetPicker(player, button, pick);
+            case Action.PickTarget pickTarget -> activatePickTarget(player, pickTarget);
         }
     }
 
@@ -375,7 +378,76 @@ public final class MenuService implements ButtonSink, Listener {
                     "&eThat player is no longer online.");
             return;
         }
-        consent.invite(presser, target, invitePlayer.world());
+        String content = presser.getName() + " wants you to join them in '" + invitePlayer.world() + "'.";
+        consent.invite(presser, target,
+                new ConsentAction.Travel(invitePlayer.world()), "Travel Invite", content);
+    }
+
+    /**
+     * Opens a menu of online players (except the presser) for a {@link Action.Pick} button. Each
+     * candidate becomes a {@link Action.PickTarget} carrying the origin button's id and cooldown, so
+     * the presser's cooldown stays keyed to the picker button and is marked when a target is chosen.
+     */
+    private void openTargetPicker(Player presser, Button origin, Action.Pick pick) {
+        List<Player> candidates = new ArrayList<>();
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (!online.getUniqueId().equals(presser.getUniqueId())) {
+                candidates.add(online);
+            }
+        }
+        if (candidates.isEmpty()) {
+            sendMessage(presser, "invite-no-players", Map.of(), "&eNobody else is online right now.");
+            return;
+        }
+        if (candidates.size() > MAX_INVITE_CANDIDATES) {
+            plugin.getLogger().warning("target picker for " + presser.getName() + " truncated from "
+                    + candidates.size() + " to " + MAX_INVITE_CANDIDATES);
+            candidates = candidates.subList(0, MAX_INVITE_CANDIDATES);
+        }
+        String promptContent = Placeholders.apply(pick.consentPrompt(), Map.of("player", presser.getName()));
+        List<Button> buttons = new ArrayList<>();
+        for (Player candidate : candidates) {
+            buttons.add(new Button(
+                    "pick." + candidate.getUniqueId(),
+                    candidate.getName(),
+                    null, null,
+                    new Action.PickTarget(candidate.getUniqueId(), pick.command(), pick.consent(),
+                            origin.id(), origin.cooldown(), promptContent),
+                    RunAs.CONSOLE, List.of(), Duration.ZERO, false, false));
+        }
+        Menu picker = new Menu("target-picker", origin.label(), "Pick a player.", buttons);
+        rendererFor(presser).open(presser, picker);
+    }
+
+    /**
+     * A target was chosen from a {@link #openTargetPicker} menu. Offline is handled gracefully. When
+     * {@code consent} is false the command runs immediately (staff); when true it is marked on the
+     * origin button's cooldown (on send) and routed through {@link ConsentService} for the target to
+     * accept.
+     */
+    private void activatePickTarget(Player presser, Action.PickTarget pick) {
+        Player target = Bukkit.getPlayer(pick.target());
+        if (target == null || !target.isOnline()) {
+            sendMessage(presser, "invite-target-offline", Map.of(), "&eThat player is no longer online.");
+            return;
+        }
+        if (pick.consent()) {
+            if (!cooldowns.isReady(presser.getUniqueId(), pick.originButtonId())) {
+                String remaining = formatDuration(cooldowns.remaining(presser.getUniqueId(), pick.originButtonId()));
+                sendMessage(presser, "cooldown", Map.of("time", remaining), "&eYou can do that again in %time%.");
+                return;
+            }
+            cooldowns.mark(presser.getUniqueId(), pick.originButtonId(), pick.cooldown());
+            String content = Placeholders.apply(pick.promptContent(), Map.of("target", target.getName()));
+            consent.invite(presser, target,
+                    new ConsentAction.RunCommand(pick.command()), "Pizza Request", content);
+        } else {
+            boolean dispatched = dispatcher.dispatchConsoleCommand(pick.command(),
+                    Map.of("target", target.getName()), "pick:" + pick.originButtonId());
+            if (dispatched) {
+                cooldowns.mark(presser.getUniqueId(), pick.originButtonId(), pick.cooldown());
+            }
+        }
     }
 
     private void sendMessage(Player player, String key, Map<String, String> vars, String fallback) {

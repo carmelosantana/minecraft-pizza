@@ -59,6 +59,8 @@ final class PizzaCommand implements CommandExecutor, TabCompleter {
                     return handleConsentResponse(sender, true);
                 case "decline":
                     return handleConsentResponse(sender, false);
+                case "config":
+                    return handleConfig(sender, args);
                 default:
                     break;
             }
@@ -86,6 +88,27 @@ final class PizzaCommand implements CommandExecutor, TabCompleter {
         }
         plugin.reloadPizzaConfig();
         sender.sendMessage(Component.text("Pizza configuration reloaded.", NamedTextColor.GREEN));
+        return true;
+    }
+
+    private boolean handleConfig(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("pizza.reload")) {
+            sender.sendMessage(Component.text("You do not have permission to do that.", NamedTextColor.RED));
+            return true;
+        }
+        if (args.length < 2 || !args[1].equalsIgnoreCase("refresh")) {
+            sender.sendMessage(Component.text("Usage: /pizza config refresh", NamedTextColor.GRAY));
+            return true;
+        }
+        try {
+            java.nio.file.Path backup = plugin.refreshConfigToDefault();
+            sender.sendMessage(Component.text(
+                    "Config reset to the default. Your old file is at " + backup.getFileName() + ".",
+                    NamedTextColor.GREEN));
+        } catch (java.io.IOException e) {
+            sender.sendMessage(Component.text(
+                    "Could not refresh the config: " + e.getMessage(), NamedTextColor.RED));
+        }
         return true;
     }
 
@@ -122,6 +145,9 @@ final class PizzaCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("pizza.reload") && "reload".startsWith(partial)) {
                 options.add("reload");
             }
+            if (sender.hasPermission("pizza.reload") && "config".startsWith(partial)) {
+                options.add("config");
+            }
             if (sender.hasPermission("pizza.invite")) {
                 if ("accept".startsWith(partial)) {
                     options.add("accept");
@@ -131,6 +157,11 @@ final class PizzaCommand implements CommandExecutor, TabCompleter {
                 }
             }
             return options;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("config")
+                && sender.hasPermission("pizza.reload")
+                && "refresh".startsWith(args[1].toLowerCase(Locale.ROOT))) {
+            return List.of("refresh");
         }
         return List.of();
     }

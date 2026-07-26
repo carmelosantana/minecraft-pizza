@@ -34,6 +34,13 @@ menus:
       - label: Staff
         permission: pizza.staff
         open: staff
+      - label: Curse a friend
+        permission: pizza.curse
+        pick: online-players
+        consent: true
+        consent-prompt: '&c%player% wants to curse you! Do you accept the challenge?'
+        command: curse trigger ZP25 %target%
+        cooldown: 1h
 
   kit:
     title: Starter Kit
@@ -106,6 +113,14 @@ menus:
         permission: pizza.staff
         run-as: console
         command: weather clear
+      - label: Curse a player
+        permission: pizza.staff
+        pick: online-players
+        command: curse trigger ZP25 %target%
+      - label: Cleanse a player
+        permission: pizza.staff
+        pick: online-players
+        command: curse stop %target%
 
 # Worlds offered by the travel menu. A world absent from this list is unreachable through Pizza
 # even if it exists on the server.
@@ -126,6 +141,7 @@ command-allowlist:
   - aguadeflorida
   - electricfurnace
   - llama
+  - curse
 
 # How long an invited player has to answer before the invite expires on its own. Pizza never
 # assumes a form callback will arrive.
