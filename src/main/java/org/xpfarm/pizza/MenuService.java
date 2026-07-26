@@ -432,13 +432,21 @@ public final class MenuService implements ButtonSink, Listener {
             return;
         }
         if (pick.consent()) {
+            if (!cooldowns.isReady(presser.getUniqueId(), pick.originButtonId())) {
+                String remaining = formatDuration(cooldowns.remaining(presser.getUniqueId(), pick.originButtonId()));
+                sendMessage(presser, "cooldown", Map.of("time", remaining), "&eYou can do that again in %time%.");
+                return;
+            }
             cooldowns.mark(presser.getUniqueId(), pick.originButtonId(), pick.cooldown());
             String content = Placeholders.apply(pick.promptContent(), Map.of("target", target.getName()));
             consent.invite(presser, target,
                     new ConsentAction.RunCommand(pick.command()), "Pizza Request", content);
         } else {
-            dispatcher.dispatchConsoleCommand(pick.command(),
+            boolean dispatched = dispatcher.dispatchConsoleCommand(pick.command(),
                     Map.of("target", target.getName()), "pick:" + pick.originButtonId());
+            if (dispatched) {
+                cooldowns.mark(presser.getUniqueId(), pick.originButtonId(), pick.cooldown());
+            }
         }
     }
 
