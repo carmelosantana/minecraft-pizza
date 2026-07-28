@@ -6,7 +6,7 @@
 
     <groupId>org.xpfarm</groupId>
     <artifactId>pizza</artifactId>
-    <version>0.5.0</version>
+    <version>0.5.1</version>
     <packaging>jar</packaging>
 
     <licenses>
