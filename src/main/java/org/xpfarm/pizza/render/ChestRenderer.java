@@ -183,25 +183,39 @@ public final class ChestRenderer implements MenuRenderer, Listener {
         return item;
     }
 
-    /**
-     * Resolves a button's configured {@link ButtonImage} to a chest icon. Only the {@code
-     * "material"} image type maps onto an {@link ItemStack} directly; anything else (a texture
-     * path meant for the Bedrock renderer, a missing image, an unrecognised material name) falls
-     * back to a plain icon rather than throwing — a bad icon is a cosmetic problem, not a reason to
-     * refuse to render the menu.
-     */
     private Material materialFor(Button button) {
-        ButtonImage image = button.image();
-        if (image != null && "material".equalsIgnoreCase(image.type()) && image.data() != null) {
-            try {
-                return Material.valueOf(image.data().toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException e) {
-                plugin.getLogger()
-                        .warning("button " + button.id() + " has an unrecognised material '"
-                                + image.data() + "'; using a default icon");
-            }
+        String name = iconNameFor(button.image());
+        if (name == null) {
+            return Material.PAPER;
         }
-        return Material.PAPER;
+        try {
+            return Material.valueOf(name.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            plugin.getLogger()
+                    .warning("button " + button.id() + " has an unrecognised material '"
+                            + name + "'; using a default icon");
+            return Material.PAPER;
+        }
+    }
+
+    /**
+     * The Bukkit {@link Material} name to use as a button's Java chest icon, or {@code null} to fall
+     * back to {@link Material#PAPER}. Prefers the dedicated {@link ButtonImage#material()} field,
+     * then the legacy {@code type: material} image whose payload is the name; a Bedrock-only
+     * {@code type: path} image (or no image) yields {@code null}. Pure and Bukkit-free so it is unit
+     * testable without a running server — only {@link #materialFor} touches {@link Material}.
+     */
+    static String iconNameFor(ButtonImage image) {
+        if (image == null) {
+            return null;
+        }
+        if (image.material() != null && !image.material().isBlank()) {
+            return image.material();
+        }
+        if ("material".equalsIgnoreCase(image.type()) && image.data() != null) {
+            return image.data();
+        }
+        return null;
     }
 
     /** One player's currently open Pizza menu: the menu itself, its permission-filtered button

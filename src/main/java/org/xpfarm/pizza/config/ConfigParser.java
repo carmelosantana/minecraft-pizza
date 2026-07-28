@@ -345,10 +345,11 @@ public final class ConfigParser {
         }
         String type = asString(map.get("type"), null);
         String data = asString(map.get("data"), null);
-        if (type == null && data == null) {
+        String material = asString(map.get("material"), null);
+        if (type == null && data == null && material == null) {
             return null;
         }
-        return new ButtonImage(type, data);
+        return new ButtonImage(type, data, material);
     }
 
     private static boolean truthy(Object raw) {
