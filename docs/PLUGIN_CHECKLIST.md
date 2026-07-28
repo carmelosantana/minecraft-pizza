@@ -256,6 +256,13 @@ resolve…` on the bare stack (expected; both wrapped plugins installed in produ
 Pizza's startup logs. Java chest icons and the Copper Sword elevated grant are client-rendered/live-only
 — carried to the gate 12 play-test. `mvn clean verify` green, 112/112.
 
+**7a re-run for v0.5.1 (2026-07-28):** Copper Sword button switched from `player-elevated` to plain
+`run-as: console` dispatching `copperkingdom give copper_sword %player%` (Copper Kingdom v0.3.0 now
+resolves a player target). Fresh stack: `plugins` listed all four green; Paper enabled `Pizza v0.5.1`;
+`copperkingdom` root still validates (warns "does not resolve" on the bare stack, expected). No
+exceptions. `mvn clean verify` green, 112/112. Deploy note: the console dispatch only functions once
+production has pulled Copper Kingdom v0.3.0 (both enrolled → pulled together on recreation).
+
 **Behaviours gate 7a could not reach — carried to gate 12 as a real play-test obligation:**
 No client attaches to a headless stack, so none of the following are verified yet, and none block
 the release: (1) whether a Bedrock client actually *renders* the Cumulus form and its buttons; (2) a
