@@ -281,6 +281,14 @@ named owner and date.
 - [x] Downloaded release assets pass `sha256sum --check SHA256SUMS.txt`. `pizza-0.1.0.jar: OK`
       against a flat download, so the checksum manifest records bare filenames correctly.
 
+**Release addendum — v0.4.0 (2026-07-28):** version consistent across `pom.xml` `0.4.0`, embedded
+`plugin.yml` `0.4.0` (Maven-filtered), and annotated tag `v0.4.0` on commit `0a7192f`. Main run
+`30370944639` on `0a7192f` = `completed / success` (recorded before tagging; tag created on that exact
+commit). Tag run `30371041743` = `completed / success`; release `v0.4.0` is stable (not draft, not
+prerelease). Assets exactly `pizza-0.4.0.jar` + `SHA256SUMS.txt` (no `original-*`); `sha256sum --check`
+= `pizza-0.4.0.jar: OK`. (Prior v0.2.0 / v0.3.0 releases followed the same path; their per-release
+evidence lives in git history and the ecosystem handbook rather than being re-templated into §8/§9.)
+
 ## 10. Updater
 
 - [x] Updater manifest/tests cover repository, destination, anchored asset regex, legacy globs,
