@@ -237,6 +237,16 @@ considered during planning and deferred to a later milestone.
       No exceptions, severe errors, or leaked secrets in startup/action/reload logs.
 - [x] Not applicable — no Ollama/Umami endpoint to exercise a negative path against.
 
+**7a re-run for v0.4.0 (2026-07-28):** config-only change (Timber Blast Axe + Sweet Bread catalog
+buttons; `timberblast` + `gfbread` allowlist roots; no Java changes; `mvn clean verify` green,
+104/104). Fresh disposable Legendary stack: RCON `plugins` listed `floodgate`, `Geyser-Spigot`,
+`Pizza (0.4.0)`, `ViaVersion` all green; Paper `Done (18.646s)!`, Java port answered a real handshake
+(protocol 775). The startup command-root validation ran and now includes both new roots — logged
+`configured command root 'timberblast' does not resolve…` and `…'gfbread' does not resolve…` on the
+bare stack (expected silent-dead-button mitigation; both wrapped plugins are installed in production).
+No exceptions or leaked secrets in Pizza's startup logs. (`curse` is not in the validation warnings
+because it sits on `pick` buttons, not `RunCommand` — the known `validateCommandRoots` gap, unchanged.)
+
 **Behaviours gate 7a could not reach — carried to gate 12 as a real play-test obligation:**
 No client attaches to a headless stack, so none of the following are verified yet, and none block
 the release: (1) whether a Bedrock client actually *renders* the Cumulus form and its buttons; (2) a
