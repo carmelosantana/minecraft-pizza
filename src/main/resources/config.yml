@@ -23,19 +23,25 @@ menus:
     content: What do you want to do?
     buttons:
       - label: My Starter Kit
-        image: { type: path, data: 'textures/items/apple' }
+        image: { type: path, data: 'textures/items/apple', material: APPLE }
         open: kit
       - label: Cool Items
-        image: { type: path, data: 'textures/items/diamond' }
+        image: { type: path, data: 'textures/items/diamond', material: DIAMOND }
         open: catalog
       - label: Travel
-        image: { type: path, data: 'textures/items/ender_pearl' }
+        image: { type: path, data: 'textures/items/ender_pearl', material: ENDER_PEARL }
         open: travel
+      - label: Shop
+        image: { type: path, data: 'textures/items/emerald', material: EMERALD }
+        run-as: player
+        command: market
       - label: Staff
         permission: pizza.staff
+        image: { material: COMMAND_BLOCK }
         open: staff
       - label: Curse a friend
         permission: pizza.curse
+        image: { material: ZOMBIE_HEAD }
         pick: online-players
         consent: true
         consent-prompt: '&c%player% wants to curse you! Do you accept the challenge?'
@@ -47,10 +53,12 @@ menus:
     content: Everything you need to get going.
     buttons:
       - label: Claim my kit
+        image: { material: CHEST }
         run-as: console
         command: starterpack give %player%
         cooldown: 24h
       - label: Put my armour on
+        image: { material: IRON_CHESTPLATE }
         run-as: console
         command: starterpack equip %player%
         cooldown: 5m
@@ -60,33 +68,45 @@ menus:
     content: Pick something to take with you.
     buttons:
       - label: Magic Carpet
+        image: { material: RED_CARPET }
         run-as: console
         command: carpet give %player%
         cooldown: 1h
       - label: Super Trash
+        image: { material: COMPOSTER }
         run-as: console
         command: supertrash give %player% 1
         cooldown: 24h
       - label: Agua de Florida
+        image: { material: POTION }
         run-as: console
         command: aguadeflorida give %player%
         cooldown: 1h
       - label: Electric Furnace
+        image: { material: BLAST_FURNACE }
         run-as: console
         command: electricfurnace give %player%
         cooldown: 24h
       - label: Llama Companion
+        image: { material: LLAMA_SPAWN_EGG }
         run-as: console
         command: llama give %player%
         cooldown: 24h
       - label: Timber Blast Axe
+        image: { material: DIAMOND_AXE }
         run-as: console
         command: timberblast give %player%
         cooldown: 24h
       - label: Sweet Bread
+        image: { material: BREAD }
         run-as: console
         command: gfbread give sweet %player% 3
         cooldown: 15m
+      - label: Copper Sword
+        image: { material: COPPER_INGOT }
+        run-as: player-elevated
+        grant: [copperkingdom.give]
+        command: copperkingdom give copper_sword
 
   travel:
     title: Travel
@@ -96,12 +116,14 @@ menus:
       # /worldcrud teleport needs a player sender but defaults its permission to op, so the node is
       # granted for exactly the duration of one dispatch and removed in a finally block.
       - label: 'Go to %world%'
+        image: { material: COMPASS }
         worlds: true
         run-as: player-elevated
         grant: [worldcrud.teleport]
         command: worldcrud teleport %world%
       - label: Invite a friend
         permission: pizza.invite
+        image: { material: PLAYER_HEAD }
         invite: true
 
   staff:
@@ -110,23 +132,28 @@ menus:
     buttons:
       - label: Give everyone a starter kit
         permission: pizza.staff
+        image: { material: CHEST }
         run-as: console
         command: starterpack give %target%
         each-online: true
       - label: Make it daytime
         permission: pizza.staff
+        image: { material: CLOCK }
         run-as: console
         command: time set day
       - label: Clear the weather
         permission: pizza.staff
+        image: { material: SUNFLOWER }
         run-as: console
         command: weather clear
       - label: Curse a player
         permission: pizza.staff
+        image: { material: ZOMBIE_HEAD }
         pick: online-players
         command: curse trigger ZP25 %target%
       - label: Cleanse a player
         permission: pizza.staff
+        image: { material: MILK_BUCKET }
         pick: online-players
         command: curse stop %target%
 
@@ -152,6 +179,8 @@ command-allowlist:
   - curse
   - timberblast
   - gfbread
+  - copperkingdom
+  - market
 
 # How long an invited player has to answer before the invite expires on its own. Pizza never
 # assumes a form callback will arrive.

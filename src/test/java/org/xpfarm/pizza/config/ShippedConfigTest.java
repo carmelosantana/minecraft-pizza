@@ -48,6 +48,7 @@ final class ShippedConfigTest {
         assertTrue(commands.contains("llama give %player%"));
         assertTrue(commands.contains("timberblast give %player%"));
         assertTrue(commands.contains("gfbread give sweet %player% 3"));
+        assertTrue(commands.contains("copperkingdom give copper_sword"));
     }
 
     @Test
@@ -55,6 +56,27 @@ final class ShippedConfigTest {
         Set<String> allow = parseShipped().commandAllowlist();
         assertTrue(allow.containsAll(List.of("aguadeflorida", "electricfurnace", "llama")));
         assertTrue(allow.containsAll(List.of("timberblast", "gfbread")));
+        assertTrue(allow.containsAll(List.of("copperkingdom", "market")));
+    }
+
+    @Test
+    void shopButtonOpensTheMarket() {
+        PizzaConfig cfg = parseShipped();
+        boolean shop = cfg.menus().values().stream()
+                .flatMap(m -> m.buttons().stream())
+                .anyMatch(b -> b.action() instanceof Action.RunCommand rc && rc.command().equals("market"));
+        assertTrue(shop, "expected a button dispatching the market command");
+    }
+
+    @Test
+    void coolItemsButtonCarriesAJavaMaterialIcon() {
+        PizzaConfig cfg = parseShipped();
+        Button coolItems = cfg.menus().get("main").buttons().stream()
+                .filter(b -> b.label().equals("Cool Items"))
+                .findFirst().orElseThrow();
+        assertNotNull(coolItems.image(), "Cool Items must carry an image");
+        assertEquals("DIAMOND", coolItems.image().material(),
+                "Cool Items must carry a Java chest material icon");
     }
 
     @Test
