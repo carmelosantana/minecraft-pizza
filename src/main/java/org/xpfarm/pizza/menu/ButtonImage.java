@@ -11,6 +11,8 @@ package org.xpfarm.pizza.menu;
 
 /**
  * An image reference attached to a button. {@code type} names the source (e.g. an item texture or
- * a URL), {@code data} is the source-specific payload.
+ * a URL) and {@code data} is the source-specific payload, both used by the Bedrock renderer.
+ * {@code material} is an optional Bukkit {@code Material} name used only by the Java chest renderer
+ * as this button's icon; the Bedrock renderer ignores it. All three are nullable.
  */
-public record ButtonImage(String type, String data) {}
+public record ButtonImage(String type, String data, String material) {}

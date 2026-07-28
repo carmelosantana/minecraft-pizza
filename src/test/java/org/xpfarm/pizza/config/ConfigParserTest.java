@@ -196,4 +196,23 @@ final class ConfigParserTest {
         assertTrue(warnings.stream().anyMatch(w -> w.contains("invite-timeout")),
                 "a present-but-unparseable invite-timeout must be logged, unlike a simply-absent one");
     }
+
+    @Test
+    void parsesTheOptionalMaterialImageField() {
+        Map<String, Object> button = new java.util.LinkedHashMap<>();
+        button.put("label", "Cool Items");
+        button.put("image", Map.of("type", "path", "data", "textures/items/diamond", "material", "DIAMOND"));
+        button.put("command", "starterpack give %player%");
+        Map<String, Object> root = Map.of(
+                "menus", Map.of("main", Map.of("buttons", List.of(button))),
+                "command-allowlist", List.of("starterpack"));
+
+        org.xpfarm.pizza.menu.ButtonImage img =
+                org.xpfarm.pizza.config.ConfigParser.parse(root, w -> {})
+                        .menus().get("main").buttons().get(0).image();
+
+        assertEquals("path", img.type());
+        assertEquals("textures/items/diamond", img.data());
+        assertEquals("DIAMOND", img.material());
+    }
 }
