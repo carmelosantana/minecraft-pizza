@@ -46,12 +46,15 @@ final class ShippedConfigTest {
         assertTrue(commands.contains("aguadeflorida give %player%"));
         assertTrue(commands.contains("electricfurnace give %player%"));
         assertTrue(commands.contains("llama give %player%"));
+        assertTrue(commands.contains("timberblast give %player%"));
+        assertTrue(commands.contains("gfbread give sweet %player% 3"));
     }
 
     @Test
     void newRootsAreInTheAllowlist() {
         Set<String> allow = parseShipped().commandAllowlist();
         assertTrue(allow.containsAll(List.of("aguadeflorida", "electricfurnace", "llama")));
+        assertTrue(allow.containsAll(List.of("timberblast", "gfbread")));
     }
 
     @Test

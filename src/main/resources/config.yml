@@ -79,6 +79,14 @@ menus:
         run-as: console
         command: llama give %player%
         cooldown: 24h
+      - label: Timber Blast Axe
+        run-as: console
+        command: timberblast give %player%
+        cooldown: 24h
+      - label: Sweet Bread
+        run-as: console
+        command: gfbread give sweet %player% 3
+        cooldown: 15m
 
   travel:
     title: Travel
@@ -142,6 +150,8 @@ command-allowlist:
   - electricfurnace
   - llama
   - curse
+  - timberblast
+  - gfbread
 
 # How long an invited player has to answer before the invite expires on its own. Pizza never
 # assumes a form callback will arrive.
