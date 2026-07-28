@@ -247,6 +247,15 @@ bare stack (expected silent-dead-button mitigation; both wrapped plugins are ins
 No exceptions or leaked secrets in Pizza's startup logs. (`curse` is not in the validation warnings
 because it sits on `pick` buttons, not `RunCommand` — the known `validateCommandRoots` gap, unchanged.)
 
+**7a re-run for v0.5.0 (2026-07-28):** Copper Sword (`player-elevated`, grants `copperkingdom.give`)
++ Shop (`run-as: player`, `market`) buttons, and a per-button Java chest icon (`ButtonImage.material`).
+Fresh Legendary stack: RCON `plugins` listed `floodgate`, `Geyser-Spigot`, `Pizza`, `ViaVersion` all
+green; Paper `Done (20.572s)!`, protocol 775. Startup command-root validation now includes both new
+roots — logged `configured command root 'copperkingdom' does not resolve…` and `…'market' does not
+resolve…` on the bare stack (expected; both wrapped plugins installed in production). No exceptions in
+Pizza's startup logs. Java chest icons and the Copper Sword elevated grant are client-rendered/live-only
+— carried to the gate 12 play-test. `mvn clean verify` green, 112/112.
+
 **Behaviours gate 7a could not reach — carried to gate 12 as a real play-test obligation:**
 No client attaches to a headless stack, so none of the following are verified yet, and none block
 the release: (1) whether a Bedrock client actually *renders* the Cumulus form and its buttons; (2) a
