@@ -298,6 +298,13 @@ prerelease). Assets exactly `pizza-0.4.0.jar` + `SHA256SUMS.txt` (no `original-*
 = `pizza-0.4.0.jar: OK`. (Prior v0.2.0 / v0.3.0 releases followed the same path; their per-release
 evidence lives in git history and the ecosystem handbook rather than being re-templated into §8/§9.)
 
+**Release addendum — v0.5.0 (2026-07-28):** `pom.xml`/`plugin.yml` `0.5.0`, annotated tag `v0.5.0` on
+commit `7674010`. Main run `30374274546` = `completed / success` (recorded before tagging). Tag run
+success; release `v0.5.0` stable. Assets exactly `pizza-0.5.0.jar` + `SHA256SUMS.txt` (no `original-*`);
+`sha256sum --check` = `pizza-0.5.0.jar: OK`. Updater unchanged (`asset_regex` `^pizza-[0-9].*\.jar$`
+follows latest stable) — production picks up 0.5.0 on next recreation, config auto-heals to add the
+Shop/Copper Sword buttons and Java icons.
+
 ## 10. Updater
 
 - [x] Updater manifest/tests cover repository, destination, anchored asset regex, legacy globs,
