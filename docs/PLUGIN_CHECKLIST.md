@@ -312,6 +312,13 @@ success; release `v0.5.0` stable. Assets exactly `pizza-0.5.0.jar` + `SHA256SUMS
 follows latest stable) — production picks up 0.5.0 on next recreation, config auto-heals to add the
 Shop/Copper Sword buttons and Java icons.
 
+**Release addendum — v0.5.1 (2026-07-28):** Copper Sword button switched to plain `run-as: console`
+(Copper Kingdom v0.3.0 supports a player target). `pom.xml` `0.5.1`, tag `v0.5.1` on commit `6b8ac2f`.
+Main run `30382913509` = success (recorded before tagging). Tag run success; release `v0.5.1` stable;
+assets `pizza-0.5.1.jar` + `SHA256SUMS.txt` (no `original-*`); `sha256sum --check` = `pizza-0.5.1.jar: OK`.
+Deploy ordering: the console dispatch works once production has Copper Kingdom v0.3.0 (both enrolled →
+pulled together on recreation).
+
 ## 10. Updater
 
 - [x] Updater manifest/tests cover repository, destination, anchored asset regex, legacy globs,
