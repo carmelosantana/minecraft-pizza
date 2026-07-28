@@ -48,7 +48,7 @@ final class ShippedConfigTest {
         assertTrue(commands.contains("llama give %player%"));
         assertTrue(commands.contains("timberblast give %player%"));
         assertTrue(commands.contains("gfbread give sweet %player% 3"));
-        assertTrue(commands.contains("copperkingdom give copper_sword"));
+        assertTrue(commands.contains("copperkingdom give copper_sword %player%"));
     }
 
     @Test

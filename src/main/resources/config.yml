@@ -104,9 +104,8 @@ menus:
         cooldown: 15m
       - label: Copper Sword
         image: { material: COPPER_INGOT }
-        run-as: player-elevated
-        grant: [copperkingdom.give]
-        command: copperkingdom give copper_sword
+        run-as: console
+        command: copperkingdom give copper_sword %player%
 
   travel:
     title: Travel
