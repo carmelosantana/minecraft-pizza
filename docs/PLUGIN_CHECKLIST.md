@@ -336,6 +336,18 @@ assets `pizza-0.5.1.jar` + `SHA256SUMS.txt` (no `original-*`); `sha256sum --chec
 Deploy ordering: the console dispatch works once production has Copper Kingdom v0.3.0 (both enrolled →
 pulled together on recreation).
 
+**Release addendum — v0.6.0 (2026-07-30):** Daily Quests main-menu button wiring in DailyQ
+(`run-as: player`, `command: daily`); `daily` added to `command-allowlist`. `pom.xml` `0.6.0`,
+embedded `plugin.yml` `0.6.0` (Maven-filtered), annotated tag `v0.6.0` on commit `5b28240`. Main run
+`30565295943` on `5b28240` = `completed / success` (recorded before tagging; tag created on that exact
+commit). Tag run `30565370418` = `completed / success`; release `v0.6.0` is stable (not draft, not
+prerelease). Assets exactly `pizza-0.6.0.jar` + `SHA256SUMS.txt` (no `original-*`); `sha256sum --check`
+= `pizza-0.6.0.jar: OK`. Updater unchanged (`asset_regex` `^pizza-[0-9].*\.jar$` follows latest stable)
+— production picks up 0.6.0 on next recreation, config auto-heals to add the Daily Quests button (the
+new shipped-config hash is in `config-hashes.txt`, so an un-customized server is refreshed cleanly).
+Deploy note: the `/daily` dispatch functions once production has DailyQ installed (enrolled as
+`daily-q.jar`); until then the startup validation logs the expected silent-dead-button warning.
+
 ## 10. Updater
 
 - [x] Updater manifest/tests cover repository, destination, anchored asset regex, legacy globs,
