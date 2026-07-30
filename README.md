@@ -4,8 +4,9 @@ Touch-friendly in-game menu that runs everyday xpfarm tasks for younger players.
 
 Most of the useful commands on a Minecraft server are gated behind operator permissions, and
 younger players cannot reliably type them anyway. Pizza puts those tasks behind buttons: claim a
-starter kit, put its armour on, get a custom item, travel to another world, and invite a friend to
-come along. Staff get an extra panel for handing out kits and setting the time and weather.
+starter kit, put its armour on, get a custom item, travel to another world, open the daily quests
+hub, and invite a friend to come along. Staff get an extra panel for handing out kits and setting
+the time and weather.
 
 Pizza adds no gameplay of its own. It is a front end over commands that already exist.
 
