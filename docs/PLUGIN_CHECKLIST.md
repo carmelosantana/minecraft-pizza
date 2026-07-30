@@ -263,6 +263,23 @@ resolves a player target). Fresh stack: `plugins` listed all four green; Paper e
 exceptions. `mvn clean verify` green, 112/112. Deploy note: the console dispatch only functions once
 production has pulled Copper Kingdom v0.3.0 (both enrolled → pulled together on recreation).
 
+**7a re-run for v0.6.0 (2026-07-30):** Daily Quests button added to the main menu (`run-as: player`,
+`command: daily`, CLOCK icon with a `textures/items/clock` path) wiring in the newly released DailyQ
+plugin; `daily` added to `command-allowlist`. Config-only change, no Java changes; `mvn clean verify`
+green, 113/113 (added `ShippedConfigTest.dailyQuestsButtonOpensTheDailyHub` and extended
+`newRootsAreInTheAllowlist`; appended the new shipped-config hash to `config-hashes.txt` for the
+auto-refresh registry). Fresh disposable Legendary stack: RCON `plugins` listed `floodgate`,
+`Geyser-Spigot`, `Pizza`, `ViaVersion` all green; Paper `Done (15.411s)!`, Java port answered a real
+handshake (protocol 775). Startup command-root validation now includes `daily` — logged `configured
+command root 'daily' does not resolve…` on the bare stack (expected silent-dead-button mitigation;
+DailyQ is enrolled in the updater as `daily-q.jar` and installed in production). Crucially there was
+**no allowlist refusal** for `daily` — the button parsed and rendered; a root missing from the
+allowlist would instead be refused at config load and omitted. `/pizza reload` re-parsed config and
+re-ran the validation (warning fired a second time) without a restart; `/pizza` from console returned
+the friendly non-player message. No exceptions or leaked secrets in Pizza's startup/reload logs. The
+button's dispatch as a player and DailyQ's hub actually opening are client-rendered/live-only —
+carried to the gate 12 play-test.
+
 **Behaviours gate 7a could not reach — carried to gate 12 as a real play-test obligation:**
 No client attaches to a headless stack, so none of the following are verified yet, and none block
 the release: (1) whether a Bedrock client actually *renders* the Cumulus form and its buttons; (2) a
