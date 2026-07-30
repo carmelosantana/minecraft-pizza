@@ -35,6 +35,10 @@ menus:
         image: { type: path, data: 'textures/items/emerald', material: EMERALD }
         run-as: player
         command: market
+      - label: Daily Quests
+        image: { type: path, data: 'textures/items/clock', material: CLOCK }
+        run-as: player
+        command: daily
       - label: Staff
         permission: pizza.staff
         image: { material: COMMAND_BLOCK }
@@ -180,6 +184,7 @@ command-allowlist:
   - gfbread
   - copperkingdom
   - market
+  - daily
 
 # How long an invited player has to answer before the invite expires on its own. Pizza never
 # assumes a form callback will arrive.

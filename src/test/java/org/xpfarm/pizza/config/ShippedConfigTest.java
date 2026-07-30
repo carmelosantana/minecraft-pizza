@@ -56,7 +56,7 @@ final class ShippedConfigTest {
         Set<String> allow = parseShipped().commandAllowlist();
         assertTrue(allow.containsAll(List.of("aguadeflorida", "electricfurnace", "llama")));
         assertTrue(allow.containsAll(List.of("timberblast", "gfbread")));
-        assertTrue(allow.containsAll(List.of("copperkingdom", "market")));
+        assertTrue(allow.containsAll(List.of("copperkingdom", "market", "daily")));
     }
 
     @Test
@@ -66,6 +66,18 @@ final class ShippedConfigTest {
                 .flatMap(m -> m.buttons().stream())
                 .anyMatch(b -> b.action() instanceof Action.RunCommand rc && rc.command().equals("market"));
         assertTrue(shop, "expected a button dispatching the market command");
+    }
+
+    @Test
+    void dailyQuestsButtonOpensTheDailyHub() {
+        Button daily = parseShipped().menus().get("main").buttons().stream()
+                .filter(b -> b.label().equals("Daily Quests"))
+                .findFirst().orElseThrow(() -> new AssertionError("expected a Daily Quests button on the main menu"));
+        assertInstanceOf(Action.RunCommand.class, daily.action(), "Daily Quests must dispatch a command");
+        assertEquals("daily", ((Action.RunCommand) daily.action()).command(),
+                "Daily Quests must dispatch the daily command");
+        assertEquals(org.xpfarm.pizza.menu.RunAs.PLAYER, daily.runAs(),
+                "Daily Quests must dispatch as the player so DailyQ opens the player's own hub");
     }
 
     @Test
